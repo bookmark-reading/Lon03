@@ -1,10 +1,11 @@
 import React, { createRef } from 'react';
 import './s2s.css'
-import { Icon, Alert, Button, Modal, Box, SpaceBetween, FormField, Select, Textarea, Checkbox, Input, Container, Header, Badge } from '@cloudscape-design/components';
+import { Icon, Alert, Button, Modal, Box, SpaceBetween, FormField, Select, Textarea, Checkbox, Toggle, Input, Container, Header, Badge } from '@cloudscape-design/components';
 import S2sEvent from './helper/s2sEvents';
 import Meter from './components/meter';
 import S2sEventDisplay from './components/eventDisplay';
 import Settings from './components/settings';
+import SessionPlayer from './components/SessionPlayer';
 import { base64ToFloat32Array } from './helper/audioHelper';
 import AudioPlayer from './helper/audioPlayer';
 import { DemoProfiles, Voices } from './helper/config';
@@ -55,6 +56,7 @@ class S2sChatBot extends React.Component {
             inputText: "",
 
             showUsage: true,
+            totalTokens: 0,
 
             // S2S config items
             configAudioInput: null,
@@ -93,27 +95,6 @@ class S2sChatBot extends React.Component {
         setTimeout(() => {
             this.scrollToBottom();
         }, 100);
-
-        // Check if we should auto-start the session after page reload
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('autoStart') === 'true') {
-            // Remove the parameter from URL
-            const url = new URL(window.location);
-            url.searchParams.delete('autoStart');
-            window.history.replaceState({}, document.title, url.toString());
-
-            // Auto-start the session after a brief delay
-            setTimeout(() => {
-                this.startSession();
-            }, 500);
-        } else {
-            // Clean up URL if there are any leftover parameters
-            const url = new URL(window.location);
-            if (url.searchParams.has('autoStart')) {
-                url.searchParams.delete('autoStart');
-                window.history.replaceState({}, document.title, url.toString());
-            }
-        }
     }
 
     componentWillUnmount() {
@@ -332,6 +313,13 @@ class S2sChatBot extends React.Component {
                         this.setState({ showUsage: true });
                     }
                 }
+                
+                // Track total tokens
+                if (message.event?.usageEvent?.usage?.totalTokens) {
+                    this.setState(prevState => ({
+                        totalTokens: prevState.totalTokens + message.event.usageEvent.usage.totalTokens
+                    }));
+                }
                 break;
             default:
                 break;
@@ -351,15 +339,8 @@ class S2sChatBot extends React.Component {
             this.setState({ sessionStarted: false });
         }
         else {
-            // Save current state and reload page to start fresh session
-            this.saveStateToStorage();
-
-            // Small delay to show the message, then reload
-            setTimeout(() => {
-                const url = new URL(window.location);
-                url.searchParams.set('autoStart', 'true');
-                window.location.href = url.toString();
-            }, 300);
+            // Start session directly without page reload
+            this.startSession();
         }
     }
 
@@ -543,7 +524,10 @@ class S2sChatBot extends React.Component {
             // Close websocket
             this.socket.close();
 
-            this.setState({ sessionStarted: false });
+            this.setState({ 
+                sessionStarted: false,
+                totalTokens: 0 // Reset token count when session ends
+            });
         }
 
     }
@@ -609,25 +593,25 @@ class S2sChatBot extends React.Component {
                 <div className='header'>
                     <div className='header-content'>
                         <div className='app-title'>
-                            <h1>📚 Reading Assistant</h1>
+                            <h1>📚 BookwormAI</h1>
                             {this.props.currentStudent && (
                                 <div className='student-info'>
                                     <span className='student-name'>
-                                        Welcome, {this.props.currentStudent.label}!
+                                        {this.props.currentStudent.label}
                                     </span>
                                     {this.props.selectedBook && (
                                         <span className='book-name'>
-                                            Reading: "{this.props.selectedBook.name}"
+                                            {this.props.selectedBook.name}
                                         </span>
                                     )}
                                 </div>
                             )}
                         </div>
-                        <div className='header-left'>
-                            <div className='main-action'>
+                        <div className='header-left' style={{display: 'none'}}>
+                            <div className='main-action' style={{display: 'none'}}>
                                 <Button variant='primary' onClick={this.handleSessionChange} className="conversation-button">
                                     <Icon name={this.state.sessionStarted ? "microphone-off" : "microphone"} />&nbsp;&nbsp;
-                                    {this.state.sessionStarted ? "End Conversation" : "Start Reading Session"}
+                                    {this.state.sessionStarted ? "End Session" : "Start Session"}
                                 </Button>
                             </div>
                             <div className='header-options'>
@@ -639,11 +623,13 @@ class S2sChatBot extends React.Component {
                                         });
                                     }}
                                     className="chat-history-checkbox"
-                                    description="You can view sample chat history in the settings"
+                                    description="View sample chat history in settings"
                                 >
-                                    Include chat history
+                                    Chat history
                                 </Checkbox>
                             </div>
+                        </div>
+                        <div className='header-center' style={{display: 'none'}}>
                             {this.state.showUsage && (
                                 <div className='meter-container'>
                                     <Meter ref={this.meterRef} />
@@ -665,19 +651,38 @@ class S2sChatBot extends React.Component {
                                         placeholder="Choose a profile"
                                     />
                                 </div>
-                                <div className='logout-button'>
+                                <div className='action-buttons'>
+                                    <div className='history-toggle'>
+                                        <Toggle
+                                            checked={this.state.includeChatHistory}
+                                            onChange={({ detail }) => {
+                                                this.setState({ includeChatHistory: detail.checked }, () => {
+                                                    this.saveStateToStorage();
+                                                });
+                                            }}
+                                        >
+                                            History
+                                        </Toggle>
+                                    </div>
                                     <Button
+                                        iconName="edit"
+                                        onClick={this.props.onChangeBook}
+                                        disabled={this.state.sessionStarted}
+                                    >
+                                        Change Book
+                                    </Button>
+                                    <Button
+                                        iconName="user-profile"
                                         onClick={this.props.onLogout}
-                                        variant="normal"
+                                        disabled={this.state.sessionStarted}
                                     >
                                         Switch Student
                                     </Button>
-                                </div>
-                                <div className='setting'>
                                     <Button
+                                        iconName="settings"
                                         onClick={() => this.setState({ showConfig: true })}
                                     >
-                                        <Icon name="settings" />
+                                        Settings
                                     </Button>
                                 </div>
                             </div>
@@ -847,6 +852,17 @@ class S2sChatBot extends React.Component {
                         this.setState(updatedSettings, () => {
                             this.saveStateToStorage();
                         });
+                    }}
+                />
+                <SessionPlayer 
+                    sessionStarted={this.state.sessionStarted}
+                    onSessionToggle={this.handleSessionChange}
+                    bookName={this.props.selectedBook?.name}
+                    tokens={this.state.totalTokens}
+                    onMetricsClick={() => {
+                        if (this.meterRef.current) {
+                            this.meterRef.current.setState({ showMeterDetail: true });
+                        }
                     }}
                 />
             </div>

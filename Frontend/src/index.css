@@ -1,3 +1,15 @@
+:root {
+  --bw-primary: #667eea;
+  --bw-primary-rgb: 102, 126, 234;
+  --bw-secondary: #764ba2;
+  --bw-secondary-rgb: 118, 75, 162;
+  --bw-ink: #333;
+  --bw-ink-muted: #666;
+  --bw-border: rgba(0, 0, 0, 0.1);
+  --bw-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --bw-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
