@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for bookmark reading charity - S3 bucket and DynamoDB tables'
+
+Resources:
+  # S3 Bucket for storing books and related files
+  BookmarkReadingCharityBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: bookmark-reading-charity-books
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # DynamoDB Table: Student Profiles
+  StudentProfilesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: student_profiles
+      AttributeDefinitions:
+        - AttributeName: student_id
+          AttributeType: N
+      KeySchema:
+        - AttributeName: student_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # DynamoDB Table: Student Sessions
+  StudentSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: student_sessions
+      AttributeDefinitions:
+        - AttributeName: session_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: session_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # DynamoDB Table: Books
+  BooksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: books
+      AttributeDefinitions:
+        - AttributeName: book_id
+          AttributeType: N
+      KeySchema:
+        - AttributeName: book_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+Outputs:
+  S3BucketName:
+    Description: 'Name of the S3 bucket for storing books'
+    Value: !Ref BookmarkReadingCharityBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3BucketName'
+
+  StudentProfilesTableName:
+    Description: 'Name of the student profiles DynamoDB table'
+    Value: !Ref StudentProfilesTable
+    Export:
+      Name: !Sub '${AWS::StackName}-StudentProfilesTable'
+
+  StudentSessionsTableName:
+    Description: 'Name of the student sessions DynamoDB table'
+    Value: !Ref StudentSessionsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-StudentSessionsTable'
+
+  BooksTableName:
+    Description: 'Name of the books DynamoDB table'
+    Value: !Ref BooksTable
+    Export:
+      Name: !Sub '${AWS::StackName}-BooksTable'
