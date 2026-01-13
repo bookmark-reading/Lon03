@@ -1,5 +1,43 @@
 const DemoProfiles = [
     {
+        "name": "StudentA - Reading Level 2",
+        "description": "Reading assistant for beginning readers with basic vocabulary support",
+        "voiceId": "tiffany",
+        "systemPrompt": "You are a friendly reading assistant for a child at Reading Level 2. Help them with reading by: 1) Using simple, clear language appropriate for beginning readers 2) Breaking down difficult words into smaller parts 3) Explaining new vocabulary in simple terms 4) Encouraging reading progress with positive reinforcement 5) Reading stories aloud when requested 6) Helping with pronunciation and word recognition. Keep responses short and encouraging. Use a warm, patient tone suitable for young learners.",
+        "toolConfig": {
+            "tools": [
+                {
+                    "toolSpec": {
+                        "name": "getReadingHelp",
+                        "description": "Get reading assistance and vocabulary help for Level 2 readers",
+                        "inputSchema": {
+                            "json": "{\"type\":\"object\",\"properties\":{\"word\":{\"type\":\"string\",\"description\":\"The word the student needs help with\"},\"context\":{\"type\":\"string\",\"description\":\"The sentence or context where the word appears\"}},\"required\":[]}"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "StudentB - Reading Level 3", 
+        "description": "Reading assistant for intermediate readers with expanded vocabulary support",
+        "voiceId": "amy",
+        "systemPrompt": "You are a friendly reading assistant for a child at Reading Level 3. Help them with reading by: 1) Using age-appropriate language for intermediate readers 2) Explaining more complex vocabulary and concepts 3) Helping with reading comprehension questions 4) Discussing story themes and characters 5) Encouraging independent reading 6) Providing context for new words and ideas. Keep responses engaging and educational. Use an encouraging tone that challenges them appropriately for their level.",
+        "toolConfig": {
+            "tools": [
+                {
+                    "toolSpec": {
+                        "name": "getReadingHelp",
+                        "description": "Get reading assistance and vocabulary help for Level 3 readers",
+                        "inputSchema": {
+                            "json": "{\"type\":\"object\",\"properties\":{\"word\":{\"type\":\"string\",\"description\":\"The word the student needs help with\"},\"context\":{\"type\":\"string\",\"description\":\"The sentence or context where the word appears\"},\"comprehension\":{\"type\":\"string\",\"description\":\"Reading comprehension question or topic to discuss\"}},\"required\":[]}"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
         "name": "Default - get current time and RAG",
         "description": "Simple demo profile with basic system prompt and toolUse like getDateTime",
         "voiceId": "matthew",

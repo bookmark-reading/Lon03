@@ -11,6 +11,7 @@ import os
 from http import HTTPStatus
 from integration.mcp_client import McpLocationClient
 from integration.strands_agent import StrandsAgent
+from api_handler import BooksAPIHandler
 
 # Configure logging
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
@@ -30,70 +31,31 @@ def debug_print(message):
 MCP_CLIENT = None
 STRANDS_AGENT = None
 
-class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        client_ip = self.client_address[0]
-        logger.info(
-            f"Health check request received from {client_ip} for path: {self.path}"
-        )
 
-        if self.path == "/health" or self.path == "/":
-            logger.info(f"Responding with 200 OK to health check from {client_ip}")
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            response = json.dumps({"status": "healthy"})
-            self.wfile.write(response.encode("utf-8"))
-            logger.info(f"Health check response sent: {response}")
-        else:
-            logger.info(
-                f"Responding with 404 Not Found to request for {self.path} from {client_ip}"
-            )
-            self.send_response(HTTPStatus.NOT_FOUND)
-            self.end_headers()
-
-    def log_message(self, format, *args):
-        # Override to use our logger instead
-        pass
-
-
-def start_health_check_server(health_host, health_port):
-    """Start the HTTP health check server on port 80."""
+def start_api_server(api_host, api_port):
+    """Start the HTTP API server."""
     try:
-        # Create the server with a socket timeout to prevent hanging
-        httpd = http.server.HTTPServer((health_host, health_port), HealthCheckHandler)
-        httpd.timeout = 5  # 5 second timeout
+        # Create the server with the BooksAPIHandler
+        httpd = http.server.HTTPServer((api_host, api_port), BooksAPIHandler)
+        httpd.timeout = 30  # 30 second timeout
 
-        logger.info(f"Starting health check server on {health_host}:{health_port}")
+        logger.info(f"Starting API server on {api_host}:{api_port}")
 
         # Run the server in a separate thread
         thread = threading.Thread(target=httpd.serve_forever)
-        thread.daemon = (
-            True  # This ensures the thread will exit when the main program exits
-        )
+        thread.daemon = True  # This ensures the thread will exit when the main program exits
         thread.start()
 
         # Verify the server is running
-        logger.info(
-            f"Health check server started at http://{health_host}:{health_port}/health"
-        )
-        logger.info(f"Health check thread is alive: {thread.is_alive()}")
+        logger.info(f"API server started at http://{api_host}:{api_port}")
+        logger.info(f"Books API available at http://{api_host}:{api_port}/api/books")
+        logger.info(f"API server thread is alive: {thread.is_alive()}")
 
-        # Try to make a local request to verify the server is responding
-        try:
-            import urllib.request
-
-            with urllib.request.urlopen(
-                f"http://localhost:{health_port}/health", timeout=2
-            ) as response:
-                logger.info(
-                    f"Local health check test: {response.status} - {response.read().decode('utf-8')}"
-                )
-        except Exception as e:
-            logger.warning(f"Local health check test failed: {e}")
+        return httpd
 
     except Exception as e:
-        logger.error(f"Failed to start health check server: {e}", exc_info=True)
+        logger.error(f"Failed to start API server: {e}", exc_info=True)
+        return None
 
 
 async def websocket_handler(websocket):
@@ -127,7 +89,7 @@ async def websocket_handler(websocket):
 
                         """Handle WebSocket connections from the frontend."""
                         # Create a new stream manager for this connection
-                        stream_manager = S2sSessionManager(model_id='amazon.nova-sonic-v1:0', region=aws_region, mcp_client=MCP_CLIENT, strands_agent=STRANDS_AGENT)
+                        stream_manager = S2sSessionManager(model_id='amazon.nova-2-sonic-v1:0', region=aws_region, mcp_client=MCP_CLIENT, strands_agent=STRANDS_AGENT)
                         
                         # Initialize the Bedrock stream
                         await stream_manager.initialize_stream()
@@ -222,13 +184,14 @@ async def forward_responses(websocket, stream_manager):
         stream_manager.close()
 
 
-async def main(host, port, health_port, enable_mcp=False, enable_strands_agent=False):
+async def main(host, port, api_port, enable_mcp=False, enable_strands_agent=False):
 
-    if health_port:
+    # Start API server
+    if api_port:
         try:
-            start_health_check_server(host, health_port)
+            start_api_server(host, api_port)
         except Exception as ex:
-            print("Failed to start health check endpoint",ex)
+            logger.error("Failed to start API server", ex)
     
     # Init MCP client
     if enable_mcp:
@@ -268,11 +231,10 @@ if __name__ == "__main__":
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
-    host, port, health_port = None, None, None
+    host, port, api_port = None, None, None
     host = str(os.getenv("HOST","localhost"))
     port = int(os.getenv("WS_PORT","8081"))
-    if os.getenv("HEALTH_PORT"):
-        health_port = int(os.getenv("HEALTH_PORT"))
+    api_port = int(os.getenv("API_PORT","8080"))
 
     enable_mcp = args.agent == "mcp"
     enable_strands = args.agent == "strands"
@@ -280,13 +242,16 @@ if __name__ == "__main__":
     aws_key_id = os.getenv("AWS_ACCESS_KEY_ID")
     aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
 
-    if not host or not port:
-        print(f"HOST and PORT are required. Received HOST: {host}, PORT: {port}")
+    """
     elif not aws_key_id or not aws_secret:
         print(f"AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required.")
+    """    
+    
+    if not host or not port:
+        print(f"HOST and PORT are required. Received HOST: {host}, PORT: {port}")
     else:
         try:
-            asyncio.run(main(host, port, health_port, enable_mcp, enable_strands))
+            asyncio.run(main(host, port, api_port, enable_mcp, enable_strands))
         except KeyboardInterrupt:
             print("Server stopped by user")
         except Exception as e:

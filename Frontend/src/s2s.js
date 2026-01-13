@@ -13,6 +13,21 @@ class S2sChatBot extends React.Component {
 
     constructor(props) {
         super(props);
+        
+        // Get the appropriate demo profile based on student selection
+        const getStudentProfile = () => {
+            if (props.currentStudent) {
+                if (props.currentStudent.value === 'studentA') {
+                    return DemoProfiles.find(profile => profile.name === 'StudentA - Reading Level 2');
+                } else if (props.currentStudent.value === 'studentB') {
+                    return DemoProfiles.find(profile => profile.name === 'StudentB - Reading Level 3');
+                }
+            }
+            return DemoProfiles[0]; // fallback to first profile
+        };
+
+        const studentProfile = getStudentProfile();
+        
         this.state = {
             status: "loading", // null, loading, loaded
             alert: null,
@@ -27,10 +42,10 @@ class S2sChatBot extends React.Component {
             audioPlayPromise: null,
             includeChatHistory: false,
 
-            selectedDemoProfileOption: DemoProfiles ? {
-                label: DemoProfiles[0].name,
-                value: DemoProfiles[0].name,
-                description: DemoProfiles[0].description
+            selectedDemoProfileOption: studentProfile ? {
+                label: studentProfile.name,
+                value: studentProfile.name,
+                description: studentProfile.description
             } : {},
 
             promptName: null,
@@ -43,11 +58,15 @@ class S2sChatBot extends React.Component {
 
             // S2S config items
             configAudioInput: null,
-            configSystemPrompt: S2sEvent.DEFAULT_SYSTEM_PROMPT,
+            configSystemPrompt: studentProfile ? studentProfile.systemPrompt : S2sEvent.DEFAULT_SYSTEM_PROMPT,
             configAudioOutput: S2sEvent.DEFAULT_AUDIO_OUTPUT_CONFIG,
-            configVoiceIdOption: { label: "Matthew (en-US)", value: "matthew" },
+            configVoiceIdOption: studentProfile ? 
+                Voices.find(voice => voice.value === studentProfile.voiceId) || { label: "Tiffany (US)", value: "tiffany" } :
+                { label: "Matthew (en-US)", value: "matthew" },
             configTurnSensitivity: "MEDIUM",
-            configToolUse: JSON.stringify(S2sEvent.DEFAULT_TOOL_CONFIG, null, 2),
+            configToolUse: studentProfile ? 
+                JSON.stringify(studentProfile.toolConfig, null, 2) : 
+                JSON.stringify(S2sEvent.DEFAULT_TOOL_CONFIG, null, 2),
             configChatHistory: JSON.stringify(S2sEvent.DEFAULT_CHAT_HISTORY, null, 2),
         };
         this.socket = null;
@@ -590,13 +609,25 @@ class S2sChatBot extends React.Component {
                 <div className='header'>
                     <div className='header-content'>
                         <div className='app-title'>
-                            <h1>Amazon Nova Sonic Workshop</h1>
+                            <h1>📚 Reading Assistant</h1>
+                            {this.props.currentStudent && (
+                                <div className='student-info'>
+                                    <span className='student-name'>
+                                        Welcome, {this.props.currentStudent.label}!
+                                    </span>
+                                    {this.props.selectedBook && (
+                                        <span className='book-name'>
+                                            Reading: "{this.props.selectedBook.name}"
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className='header-left'>
                             <div className='main-action'>
                                 <Button variant='primary' onClick={this.handleSessionChange} className="conversation-button">
                                     <Icon name={this.state.sessionStarted ? "microphone-off" : "microphone"} />&nbsp;&nbsp;
-                                    {this.state.sessionStarted ? "End Conversation" : "Start Conversation"}
+                                    {this.state.sessionStarted ? "End Conversation" : "Start Reading Session"}
                                 </Button>
                             </div>
                             <div className='header-options'>
@@ -621,7 +652,7 @@ class S2sChatBot extends React.Component {
                         </div>
                         <div className='header-right'>
                             <div className='controls-group'>
-                                <div className='profile-selector'>
+                                <div className='profile-selector' style={{display: 'none'}}>
                                     <span className='profile-label'>Select Profile:</span>
                                     <Select
                                         selectedOption={this.state.selectedDemoProfileOption}
@@ -633,6 +664,14 @@ class S2sChatBot extends React.Component {
                                         })) : []}
                                         placeholder="Choose a profile"
                                     />
+                                </div>
+                                <div className='logout-button'>
+                                    <Button
+                                        onClick={this.props.onLogout}
+                                        variant="normal"
+                                    >
+                                        Switch Student
+                                    </Button>
                                 </div>
                                 <div className='setting'>
                                     <Button
@@ -650,7 +689,7 @@ class S2sChatBot extends React.Component {
                     <div className="content-columns">
                         <div className="conversation-section">
                             <div className="section-header">
-                                <h2>Conversation</h2>
+                                <h2>📖 Reading Conversation</h2>
                             </div>
                             <div className="conversation-container">
                                 <div className="chatarea">
@@ -683,7 +722,7 @@ class S2sChatBot extends React.Component {
                                         <input
                                             type="text"
                                             className="inputtext"
-                                            placeholder="Send a message to Nova Sonic"
+                                            placeholder="Ask your reading assistant for help..."
                                             onChange={(e) => this.setState({ inputText: e.target.value })}
                                             onKeyDown={this.handleSendText}
                                             value={this.state.inputText}
