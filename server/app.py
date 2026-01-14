@@ -67,7 +67,7 @@ class ReadingAssistant:
             # Prepare the prompt for Nova Lite using config
             prompt = READING_ASSISTANT_PROMPT.format(text=accumulated)
 
-            # Call Bedrock Nova Lite
+            # Call Bedrock Nova Lite using the correct format
             request_body = {
                 "messages": [
                     {
@@ -81,14 +81,14 @@ class ReadingAssistant:
                 }
             }
             
-            response = self.bedrock_runtime.converse(
+            response = self.bedrock_runtime.invoke_model(
                 modelId=BEDROCK_MODEL_ID,
-                messages=request_body["messages"],
-                inferenceConfig=request_body["inferenceConfig"]
+                body=json.dumps(request_body)
             )
             
-            # Extract response
-            response_text = response['output']['message']['content'][0]['text']
+            # Parse response for Nova model
+            response_body = json.loads(response['body'].read())
+            response_text = response_body['output']['message']['content'][0]['text']
             
             # Parse JSON response
             result = json.loads(response_text)
