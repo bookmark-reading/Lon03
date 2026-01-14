@@ -107,27 +107,20 @@ class ReadingAssistant:
                 print(f"[{datetime.now()}] Bedrock returned empty response")
                 return None
             
-            # Parse JSON response
+            # Parse JSON response - try markdown extraction first if present
+            if "```json" in response_text:
+                import re
+                json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+                if json_match:
+                    response_text = json_match.group(1)
+                    print(f"[{datetime.now()}] Extracted JSON from markdown code block")
+            
             try:
                 result = json.loads(response_text)
             except json.JSONDecodeError as json_err:
                 print(f"[{datetime.now()}] Error parsing Bedrock response as JSON: {json_err}")
                 print(f"[{datetime.now()}] Raw response text: {response_text}")
-                
-                # Try to extract JSON from markdown code blocks if present
-                if "```json" in response_text:
-                    import re
-                    json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-                    if json_match:
-                        try:
-                            result = json.loads(json_match.group(1))
-                            print(f"[{datetime.now()}] Successfully extracted JSON from markdown")
-                        except:
-                            return None
-                    else:
-                        return None
-                else:
-                    return None
+                return None
             
             # Update analysis time
             self.last_analysis_time = datetime.now()
@@ -175,6 +168,7 @@ class TranscriptHandler(TranscriptResultStreamHandler):
         super().__init__(transcript_result_stream)
         self.client_id = client_id
         self.server_instance = server_instance
+        self.processed_result_ids = set()  # Track processed results to avoid duplicates
     
     async def handle_stream(self):
         """Handle the transcript result stream"""
@@ -191,8 +185,24 @@ class TranscriptHandler(TranscriptResultStreamHandler):
         for result in results:
             # Only process final results
             if not result.is_partial:
+                # Check if we've already processed this result
+                result_id = result.result_id if hasattr(result, 'result_id') else None
+                if result_id and result_id in self.processed_result_ids:
+                    continue  # Skip duplicate
+                
+                if result_id:
+                    self.processed_result_ids.add(result_id)
+                    # Keep only recent IDs to prevent memory growth
+                    if len(self.processed_result_ids) > 100:
+                        self.processed_result_ids = set(list(self.processed_result_ids)[-50:])
+                
                 for alt in result.alternatives:
                     transcript = alt.transcript
+                    
+                    # Skip empty transcripts
+                    if not transcript or not transcript.strip():
+                        continue
+                    
                     confidence = alt.confidence if hasattr(alt, 'confidence') else 'N/A'
                     
                     # Print transcription
