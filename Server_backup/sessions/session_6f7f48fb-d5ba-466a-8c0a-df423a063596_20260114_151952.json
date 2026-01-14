@@ -1,0 +1,31 @@
+{
+  "session_id": "6f7f48fb-d5ba-466a-8c0a-df423a063596",
+  "start_time": "2026-01-14T15:19:28.210861",
+  "end_time": "2026-01-14T15:19:52.740177",
+  "total_duration_minutes": 0.40882193333333333,
+  "total_words": 0,
+  "average_wpm": 0.0,
+  "overall_accuracy": null,
+  "average_confidence": 0.0,
+  "total_miscue_counts": {
+    "omissions": 0,
+    "insertions": 0,
+    "substitutions": 0,
+    "repetitions": 0,
+    "self_corrections": 0,
+    "hesitations": 0,
+    "total": 0
+  },
+  "batch_metrics": [],
+  "all_miscue_events": [],
+  "full_transcript": "",
+  "expected_passage": null,
+  "insights": {
+    "reading_speed": "below_grade_level",
+    "reading_speed_note": "Reading speed of 0 WPM is below typical range (60-150 WPM)",
+    "total_miscues": 0,
+    "total_words": 0,
+    "miscue_rate": 0,
+    "batches_analyzed": 0
+  }
+}

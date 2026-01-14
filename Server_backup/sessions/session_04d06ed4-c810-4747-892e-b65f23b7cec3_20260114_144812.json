@@ -1,0 +1,31 @@
+{
+  "session_id": "04d06ed4-c810-4747-892e-b65f23b7cec3",
+  "start_time": "2026-01-14T14:47:02.158460",
+  "end_time": "2026-01-14T14:48:12.378205",
+  "total_duration_minutes": 1.1703290833333333,
+  "total_words": 42,
+  "average_wpm": 35.88734194349467,
+  "overall_accuracy": null,
+  "average_confidence": 0.0,
+  "total_miscue_counts": {
+    "omissions": 0,
+    "insertions": 0,
+    "substitutions": 0,
+    "repetitions": 0,
+    "self_corrections": 0,
+    "hesitations": 0,
+    "total": 0
+  },
+  "batch_metrics": [],
+  "all_miscue_events": [],
+  "full_transcript": "Mike check Mike Mike check, mic check 1212. The boy's going to school. I went off to school, we went to blah, blah blah, blah blah blah blah blah blah blah blah blah blah. so to OK, OK, OK, 12345. my constitution",
+  "expected_passage": null,
+  "insights": {
+    "reading_speed": "below_grade_level",
+    "reading_speed_note": "Reading speed of 36 WPM is below typical range (60-150 WPM)",
+    "total_miscues": 0,
+    "total_words": 42,
+    "miscue_rate": 0.0,
+    "batches_analyzed": 0
+  }
+}

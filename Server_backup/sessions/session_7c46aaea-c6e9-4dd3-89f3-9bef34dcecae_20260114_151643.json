@@ -1,0 +1,77 @@
+{
+  "session_id": "7c46aaea-c6e9-4dd3-89f3-9bef34dcecae",
+  "start_time": "2026-01-14T15:15:06.580602",
+  "end_time": "2026-01-14T15:16:43.801852",
+  "total_duration_minutes": 1.6203541666666665,
+  "total_words": 127,
+  "average_wpm": 78.37792663640923,
+  "overall_accuracy": null,
+  "average_confidence": 0.0,
+  "total_miscue_counts": {
+    "omissions": 0,
+    "insertions": 0,
+    "substitutions": 0,
+    "repetitions": 89,
+    "self_corrections": 1,
+    "hesitations": 4,
+    "total": 94
+  },
+  "batch_metrics": [
+    {
+      "batch_id": "f1f425f0-6665-4f67-a216-05efb16b96d1",
+      "session_id": "7c46aaea-c6e9-4dd3-89f3-9bef34dcecae",
+      "start_time": "2026-01-14T15:15:10.747353",
+      "end_time": "2026-01-14T15:16:16.739614",
+      "duration_seconds": 65.992261,
+      "word_count": 127,
+      "words_per_minute": 135.47043038879966,
+      "average_confidence": 0.0,
+      "miscue_counts": {
+        "omissions": 0,
+        "insertions": 0,
+        "substitutions": 0,
+        "repetitions": 89,
+        "self_corrections": 1,
+        "hesitations": 4,
+        "total": 94
+      },
+      "miscue_events": [],
+      "expected_text": null,
+      "accuracy_percentage": null,
+      "transcriptions": [
+        "I",
+        "I",
+        "I",
+        "and",
+        "in the, in the, in the, well, well, well, well, on, on, on, on.",
+        "The, the, the, the, the, any, any, any, any.",
+        "different, different, different, different, different, and, and, and, and, and.",
+        "and and and and more, more, more, more, more.",
+        "fast, fast, fast, fast, fast, and, and, and, and, and less, less,, less less, slow, low, low low, low low.",
+        "every, every, every, every, every, and, and, and, and, and as it's, it's, it's, it's pat pats, ha, ha ha late, late, late, late, late.",
+        "Mhm",
+        "Yeah, yeah, yeah, yeah",
+        "I",
+        "I, I, I, me, me, me, me, me, I think, I think, I think, I think, I think I think.",
+        "and the ding ding ding ding ding.",
+        "Yeah, yeah, yeah, yeah, yeah, yeah, no, no, it's, it's, it's, it's, it's, it's it's quite, quite, quite, quite, quite fast, fast, fast, fast, fast."
+      ]
+    }
+  ],
+  "all_miscue_events": [],
+  "full_transcript": "I I I and in the, in the, in the, well, well, well, well, on, on, on, on. The, the, the, the, the, any, any, any, any. different, different, different, different, different, and, and, and, and, and. and and and and more, more, more, more, more. fast, fast, fast, fast, fast, and, and, and, and, and less, less,, less less, slow, low, low low, low low. every, every, every, every, every, and, and, and, and, and as it's, it's, it's, it's pat pats, ha, ha ha late, late, late, late, late. Mhm Yeah, yeah, yeah, yeah I I, I, I, me, me, me, me, me, I think, I think, I think, I think, I think I think. and the ding ding ding ding ding. Yeah, yeah, yeah, yeah, yeah, yeah, no, no, it's, it's, it's, it's, it's, it's it's quite, quite, quite, quite, quite fast, fast, fast, fast, fast. wait wait wait wait it's, it's, it's, it's everywhere, do it do it do it Those, those, those, those, those boom boom boom boom boom. Yeah, yeah, yeah, yeah, yeah yeah, yeah, yeah, yeah, yeah, yeah, yeah, yeah, yeah, yeah, yeah, yeah,, yeah, yeah, we won't, we won't to right there, right there, right,",
+  "expected_passage": null,
+  "insights": {
+    "reading_speed": "on_grade_level",
+    "reading_speed_note": "Reading speed of 78 WPM is within typical range",
+    "dominant_miscue_type": "repetitions",
+    "dominant_miscue_count": 89,
+    "recommendation": "Work on confidence and fluency through repeated reading",
+    "self_correction_rate": 1.0752688172043012,
+    "self_monitoring": "Encourage the student to self-monitor and self-correct more actively",
+    "total_miscues": 93,
+    "total_words": 127,
+    "miscue_rate": 73.22834645669292,
+    "batches_analyzed": 1
+  }
+}

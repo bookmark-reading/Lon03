@@ -1,0 +1,31 @@
+{
+  "session_id": "a19e575f-cd83-492c-be04-bec95e150a8d",
+  "start_time": "2026-01-14T15:22:23.633268",
+  "end_time": "2026-01-14T15:22:41.662351",
+  "total_duration_minutes": 0.30048471666666665,
+  "total_words": 36,
+  "average_wpm": 119.8064260949933,
+  "overall_accuracy": null,
+  "average_confidence": 0.0,
+  "total_miscue_counts": {
+    "omissions": 0,
+    "insertions": 0,
+    "substitutions": 0,
+    "repetitions": 0,
+    "self_corrections": 0,
+    "hesitations": 0,
+    "total": 0
+  },
+  "batch_metrics": [],
+  "all_miscue_events": [],
+  "full_transcript": "I te te te te te tin te te te te te te te te te te te te te te te te te te tin te te tin tin din din din din 13333 333.",
+  "expected_passage": null,
+  "insights": {
+    "reading_speed": "on_grade_level",
+    "reading_speed_note": "Reading speed of 120 WPM is within typical range",
+    "total_miscues": 0,
+    "total_words": 36,
+    "miscue_rate": 0.0,
+    "batches_analyzed": 0
+  }
+}

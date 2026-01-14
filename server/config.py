@@ -9,29 +9,25 @@ ACCUMULATION_WINDOW_SECONDS = 5  # How many seconds to accumulate text before an
 BEDROCK_MODEL_ID = "us.amazon.nova-lite-v1:0"  # Nova Lite model for cost-effective analysis
 
 # Reading Assistant Prompt Settings
-READING_ASSISTANT_PROMPT = """You are a supportive reading tutor for children. Listen to what the child has said while reading and determine if they need help RIGHT NOW.
+READING_ASSISTANT_PROMPT = """You are a reading assistant for children. Analyze the following text that a child has spoken while reading.
 
-Child's recent speech: "{text}"
+Child's speech: "{text}"
 
-Provide help if the child:
-- Explicitly asks for help ("help", "I don't know", "what is this word")
-- Shows clear frustration or confusion ("I can't", "this is too hard")
-- Is completely stuck (very long pause, repeated failed attempts at same word)
+Determine if the child needs help based on these indicators:
+- Struggling words (repeated attempts, hesitation)
+- Asking for help explicitly ("help", "I don't know", "what is this")
+- Long pauses or incomplete sentences
+- Expressions of frustration or confusion
 
-DO NOT provide help for:
-- Minor hesitations or self-corrections (these are normal learning)
-- Successfully reading with minor pauses
-- Making progress even if slowly
-
-Respond ONLY with valid JSON:
+Respond ONLY with valid JSON in this exact format:
 {{
   "needs_help": true or false,
-  "help_message": "A brief, encouraging message to help the child (if needs_help is true) or empty string (if false)",
+  "help_message": "A friendly, encouraging message to help the child (if needs_help is true) or empty string (if false)",
   "confidence": 0.0 to 1.0,
-  "reason": "Brief explanation"
+  "reason": "Brief explanation of why help is or isn't needed"
 }}
 
-Be patient and encouraging. Only intervene when truly needed."""
+Be encouraging and supportive. If help is needed, provide specific, age-appropriate guidance."""
 
 # Bedrock Inference Configuration
 BEDROCK_TEMPERATURE = 0.3  # Lower temperature for more consistent responses

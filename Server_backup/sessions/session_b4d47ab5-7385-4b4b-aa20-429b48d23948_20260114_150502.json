@@ -1,0 +1,79 @@
+{
+  "session_id": "b4d47ab5-7385-4b4b-aa20-429b48d23948",
+  "start_time": "2026-01-14T14:51:04.073529",
+  "end_time": "2026-01-14T15:05:02.488841",
+  "total_duration_minutes": 13.973588533333333,
+  "total_words": 43,
+  "average_wpm": 3.07723387570956,
+  "overall_accuracy": null,
+  "average_confidence": 0.0,
+  "total_miscue_counts": {
+    "omissions": 0,
+    "insertions": 0,
+    "substitutions": 0,
+    "repetitions": 14,
+    "self_corrections": 1,
+    "hesitations": 3,
+    "total": 18
+  },
+  "batch_metrics": [
+    {
+      "batch_id": "d81bed27-d2aa-4262-905a-d16ac244141c",
+      "session_id": "b4d47ab5-7385-4b4b-aa20-429b48d23948",
+      "start_time": "2026-01-14T14:51:17.248189",
+      "end_time": "2026-01-14T14:52:34.176452",
+      "duration_seconds": 76.928263,
+      "word_count": 43,
+      "words_per_minute": 49.91663467040715,
+      "average_confidence": 0.0,
+      "miscue_counts": {
+        "omissions": 0,
+        "insertions": 0,
+        "substitutions": 0,
+        "repetitions": 14,
+        "self_corrections": 1,
+        "hesitations": 3,
+        "total": 18
+      },
+      "miscue_events": [],
+      "expected_text": null,
+      "accuracy_percentage": null,
+      "transcriptions": [
+        "That's that's done, done, that so",
+        "Who.",
+        "I",
+        "like",
+        "I",
+        "The the",
+        "they should show I, I.",
+        "I, I, etc.",
+        "I",
+        "what is",
+        "Mhm.",
+        "I used this for you have to, yeah, yeah.",
+        "Yeah",
+        "you",
+        "so",
+        "what's what's",
+        "that.",
+        "The idea is that we'll The idea is that we'll find finder but they they do do you need to, to now just yeah, yeah,"
+      ]
+    }
+  ],
+  "all_miscue_events": [],
+  "full_transcript": "That's that's done, done, that so Who. I like I The the they should show I, I. I, I, etc. I what is Mhm. I used this for you have to, yeah, yeah. Yeah you so what's what's that. The idea is that we'll The idea is that we'll find finder but they they do do you need to, to now just yeah, yeah,",
+  "expected_passage": null,
+  "insights": {
+    "reading_speed": "below_grade_level",
+    "reading_speed_note": "Reading speed of 3 WPM is below typical range (60-150 WPM)",
+    "dominant_miscue_type": "repetitions",
+    "dominant_miscue_count": 14,
+    "recommendation": "Work on confidence and fluency through repeated reading",
+    "self_correction_rate": 5.88235294117647,
+    "self_monitoring": "Encourage the student to self-monitor and self-correct more actively",
+    "total_miscues": 17,
+    "total_words": 43,
+    "miscue_rate": 39.53488372093023,
+    "batches_analyzed": 1
+  }
+}
