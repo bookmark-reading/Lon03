@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio WebSocket Client</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Audio WebSocket Client</h1>
+        
+        <div class="status-section">
+            <div class="status-item">
+                <span class="label">WebSocket Status:</span>
+                <span id="ws-status" class="status disconnected">Disconnected</span>
+            </div>
+            <div class="status-item">
+                <span class="label">Microphone Status:</span>
+                <span id="mic-status" class="status inactive">Inactive</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="connect-btn" class="btn primary">Connect to Server</button>
+            <button id="record-btn" class="btn secondary" disabled>Start Recording</button>
+            <button id="stop-btn" class="btn danger" disabled>Stop Recording</button>
+        </div>
+
+        <div class="audio-section">
+            <div class="audio-visualizer">
+                <canvas id="visualizer" width="400" height="100"></canvas>
+            </div>
+            <div class="audio-info">
+                <p>Recording Duration: <span id="duration">0s</span></p>
+                <p>Data Sent: <span id="data-sent">0</span> chunks</p>
+            </div>
+        </div>
+
+        <div class="log-section">
+            <h3>Activity Log</h3>
+            <div id="log" class="log-container"></div>
+        </div>
+
+        <div class="transcription-section">
+            <h3>Live Transcription</h3>
+            <div id="transcription-display" class="transcription-container">
+                <div id="partial-text" class="partial-transcription"></div>
+                <div id="final-text" class="final-transcription"></div>
+            </div>
+        </div>
+
+        <div class="help-section" id="help-section" style="display: none;">
+            <h3>📚 Reading Assistant</h3>
+            <div id="help-message" class="help-container"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
