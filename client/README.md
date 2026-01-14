@@ -1,56 +1,73 @@
-# Audio WebSocket Client
+# Welcome to your Lovable project
 
-A Node.js web application that provides a browser interface for recording audio and sending it to a WebSocket server.
+## Project info
 
-## Setup
+**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
-1. Install dependencies:
-```bash
-npm install
-```
+## How can I edit this code?
 
-2. Start the development server:
-```bash
-npm start
-```
+There are several ways of editing your application.
 
-Or for development with auto-reload:
-```bash
+**Use Lovable**
+
+Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+
+Changes made via Lovable will be committed automatically to this repo.
+
+**Use your preferred IDE**
+
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+
+Follow these steps:
+
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
+
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
+
+# Step 3: Install the necessary dependencies.
+npm i
+
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-3. Open your browser and navigate to `http://localhost:3000`
+**Edit a file directly in GitHub**
 
-## Features
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
 
-- **WebSocket Connection**: Connects to the audio server at `ws://localhost:8765`
-- **Audio Recording**: Records audio from user's microphone
-- **Real-time Visualization**: Shows audio frequency visualization while recording
-- **Base64 Encoding**: Converts audio to base64 format before sending
-- **Live Status**: Shows connection and microphone status
-- **Activity Log**: Displays all connection and recording activities
-- **Chunked Sending**: Sends audio data in 1-second chunks for real-time processing
+**Use GitHub Codespaces**
 
-## Usage
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
-1. **Connect to Server**: Click "Connect to Server" to establish WebSocket connection
-2. **Start Recording**: Click "Start Recording" to begin audio capture (browser will ask for microphone permission)
-3. **Monitor Activity**: Watch the visualizer and activity log for real-time feedback
-4. **Stop Recording**: Click "Stop Recording" to end audio capture
-5. **Disconnect**: Click "Disconnect" to close the WebSocket connection
+## What technologies are used for this project?
 
-## Browser Requirements
+This project is built with:
 
-- Modern browser with WebRTC support (Chrome, Firefox, Safari, Edge)
-- Microphone access permission
-- WebSocket support
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
 
-## Audio Format
+## How can I deploy this project?
 
-- **Input**: Microphone audio (WebM with Opus codec)
-- **Output**: Base64 encoded audio chunks sent via WebSocket
-- **Frequency**: 1-second chunks for real-time streaming
+Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
-## Server Integration
+## Can I connect a custom domain to my Lovable project?
 
-This client is designed to work with the Python WebSocket server in the `../server` directory. Make sure the server is running on `localhost:8765` before connecting.
+Yes, you can!
+
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
