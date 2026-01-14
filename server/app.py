@@ -85,6 +85,20 @@ class ReadingAssistant:
         """Check if enough time has passed to analyze"""
         if not self.accumulated_text:
             return False
+        
+        # Check if accumulated text has enough content
+        accumulated = self.get_accumulated_text()
+        word_count = len(accumulated.split())
+        
+        # Skip if too few words (likely just noise or filler)
+        if word_count < 5:
+            return False
+        
+        # Skip if just filler words
+        filler_words = {'um', 'uh', 'er', 'ah', 'hmm', 'like'}
+        words = set(accumulated.lower().split())
+        if len(words) > 0 and words.issubset(filler_words):
+            return False
             
         if self.last_analysis_time is None:
             return True
@@ -127,10 +141,46 @@ class ReadingAssistant:
             
             # Parse response for Nova model
             response_body = json.loads(response['body'].read())
-            response_text = response_body['output']['message']['content'][0]['text']
+            
+            # Debug: Print response structure
+            print(f"[DEBUG] Bedrock response structure: {response_body.keys()}")
+            
+            # Extract response text
+            if 'output' in response_body and 'message' in response_body['output']:
+                response_text = response_body['output']['message']['content'][0]['text']
+            else:
+                print(f"[ERROR] Unexpected Bedrock response structure: {response_body}")
+                return None
+            
+            # Debug: Print raw response text
+            print(f"[DEBUG] Bedrock response text: {response_text[:200]}...")
+            
+            # Check if response is empty
+            if not response_text or not response_text.strip():
+                print(f"[{datetime.now()}] Bedrock returned empty response")
+                return None
             
             # Parse JSON response
-            result = json.loads(response_text)
+            try:
+                result = json.loads(response_text)
+            except json.JSONDecodeError as json_err:
+                print(f"[{datetime.now()}] Error parsing Bedrock response as JSON: {json_err}")
+                print(f"[{datetime.now()}] Raw response text: {response_text}")
+                
+                # Try to extract JSON from markdown code blocks if present
+                if "```json" in response_text:
+                    import re
+                    json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+                    if json_match:
+                        try:
+                            result = json.loads(json_match.group(1))
+                            print(f"[{datetime.now()}] Successfully extracted JSON from markdown")
+                        except:
+                            return None
+                    else:
+                        return None
+                else:
+                    return None
             
             # Update analysis time
             self.last_analysis_time = datetime.now()
@@ -142,9 +192,12 @@ class ReadingAssistant:
             
         except json.JSONDecodeError as e:
             print(f"[{datetime.now()}] Error parsing Bedrock response: {e}")
+            print(f"[{datetime.now()}] This usually means Bedrock returned an empty or malformed response")
             return None
         except Exception as e:
             print(f"[{datetime.now()}] Error analyzing with Bedrock: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     async def text_to_speech(self, text):
