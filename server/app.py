@@ -31,6 +31,15 @@ from models import (
     SessionMetrics
 )
 from audio_buffer_manager import AudioBufferManager
+
+# DynamoDB imports (optional)
+try:
+    from dynamodb_persistence import DynamoDBPersistence
+    from dynamodb_config import DynamoDBConfig
+    DYNAMODB_AVAILABLE = True
+except ImportError:
+    DYNAMODB_AVAILABLE = False
+    print("[WARNING] DynamoDB modules not available. Running without persistence.")
 from analysis import BatchAnalyzer, SessionAnalyzer
 
 class ReadingAssistant:
@@ -243,6 +252,10 @@ class TranscriptHandler(TranscriptResultStreamHandler):
                         # Add to session
                         session.transcriptions.append(transcription_obj)
                         
+                        # Persist to DynamoDB if enabled
+                        if self.server_instance.dynamodb:
+                            await self.server_instance.dynamodb.save_transcription(transcription_obj)
+                        
                         # Print transcription
                         print(f"\n[TRANSCRIPTION] {transcript}")
                         print(f"[METADATA] Time: {start_time_ms}-{end_time_ms}ms, Confidence: {confidence:.2f}")
@@ -346,6 +359,10 @@ class TranscriptHandler(TranscriptResultStreamHandler):
                     # Add to session
                     session.help_events.append(help_event)
                     
+                    # Persist to DynamoDB if enabled
+                    if self.server_instance.dynamodb:
+                        await self.server_instance.dynamodb.save_help_event(help_event)
+                    
                     # Print help event details
                     print(f"[HELP EVENT] Session offset: {transcription_obj.session_offset_ms}ms")
                     print(f"[HELP EVENT] Accumulation duration: {accumulation_duration_ms}ms")
@@ -408,7 +425,25 @@ class AudioWebSocketServer:
         self.clients = {}
         self.transcribe_clients = {}
         self.reading_assistants = {}  # One assistant per client
-        self.audio_buffer_manager = AudioBufferManager()  # Centralized audio/timeline management
+        
+        # Initialize DynamoDB persistence if enabled
+        self.dynamodb = None
+        if DYNAMODB_AVAILABLE and DynamoDBConfig.is_enabled():
+            try:
+                self.dynamodb = DynamoDBPersistence()
+                print(f"[DynamoDB] Persistence enabled")
+                print(f"[DynamoDB] Config: {DynamoDBConfig.get_config_summary()}")
+            except Exception as e:
+                print(f"[DynamoDB] Failed to initialize: {e}")
+                print(f"[DynamoDB] Running without persistence")
+        else:
+            if not DYNAMODB_AVAILABLE:
+                print("[DynamoDB] Modules not available")
+            else:
+                print("[DynamoDB] Persistence disabled (set ENABLE_DYNAMODB_PERSISTENCE=true to enable)")
+        
+        # Initialize AudioBufferManager with optional DynamoDB
+        self.audio_buffer_manager = AudioBufferManager(dynamodb_persistence=self.dynamodb)
         
         # Analysis components
         self.batch_analyzers = {}  # One batch analyzer per client
@@ -737,6 +772,10 @@ class AudioWebSocketServer:
                 
                 await websocket.send(json.dumps(message))
                 
+                # Persist batch metrics to DynamoDB if enabled
+                if self.dynamodb:
+                    await self.dynamodb.save_batch_metrics(batch_metrics)
+                
                 # Print detailed batch analysis to console
                 print(f"\n{'='*60}")
                 print(f"[BATCH ANALYSIS] Batch {str(batch_metrics.batch_id)[:8]}...")
@@ -833,6 +872,10 @@ class AudioWebSocketServer:
                 print(f"Average WPM: {session_summary.average_wpm:.1f}")
                 if session_summary.overall_accuracy:
                     print(f"Accuracy: {session_summary.overall_accuracy:.1f}%")
+            
+            # Persist session summary to DynamoDB (even if client disconnected)
+            if self.dynamodb:
+                await self.dynamodb.save_session_summary(session_summary)
                 
         except Exception as e:
             print(f"[{datetime.now()}] Error sending session summary: {e}")
@@ -872,9 +915,14 @@ class AudioWebSocketServer:
         print("3. Print transcribed text to console")
         print("4. Analyze reading patterns per minute")
         print("5. Generate session summaries with miscue analysis")
-        print("\\nNOTE: Audio format compatibility depends on browser and Transcribe support")
+        print("\nNOTE: Audio format compatibility depends on browser and Transcribe support")
         print("If transcription doesn't work, the client may need to send PCM format")
-        print("\\nWaiting for connections...")
+        print("\nWaiting for connections...")
+        
+        # Start DynamoDB workers if enabled
+        if self.dynamodb:
+            print("[DynamoDB] Starting background workers...")
+            asyncio.create_task(self.dynamodb.start_write_worker())
         
         async with websockets.serve(self.handle_client, self.host, self.port):
             await asyncio.Future()  # Run forever
@@ -884,4 +932,8 @@ if __name__ == "__main__":
     try:
         asyncio.run(server.start_server())
     except KeyboardInterrupt:
-        print("\\nServer stopped by user")
+        print("\nServer stopped by user")
+        # Stop DynamoDB workers if running
+        if server.dynamodb:
+            print("[DynamoDB] Stopping workers...")
+            asyncio.run(server.dynamodb.stop_workers())

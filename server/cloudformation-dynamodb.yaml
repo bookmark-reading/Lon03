@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB table for Reading Assistant audio metadata persistence'
+
+Parameters:
+  TableName:
+    Type: String
+    Default: ReadingSessions
+    Description: Name of the DynamoDB table
+    
+  TTLDays:
+    Type: Number
+    Default: 30
+    Description: Number of days to retain data (TTL)
+    
+  BillingMode:
+    Type: String
+    Default: PAY_PER_REQUEST
+    AllowedValues:
+      - PAY_PER_REQUEST
+      - PROVISIONED
+    Description: Billing mode for the table
+    
+  ProvisionedReadCapacity:
+    Type: Number
+    Default: 5
+    Description: Provisioned read capacity (only used if BillingMode is PROVISIONED)
+    
+  ProvisionedWriteCapacity:
+    Type: Number
+    Default: 5
+    Description: Provisioned write capacity (only used if BillingMode is PROVISIONED)
+    
+  EnablePointInTimeRecovery:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable point-in-time recovery for the table
+    
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Environment name
+
+Conditions:
+  IsProvisioned: !Equals [!Ref BillingMode, PROVISIONED]
+  EnablePITR: !Equals [!Ref EnablePointInTimeRecovery, 'true']
+
+Resources:
+  ReadingSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: !Ref BillingMode
+      
+      # Primary Key
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+          
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+          
+      # Provisioned Capacity (only if PROVISIONED mode)
+      ProvisionedThroughput:
+        !If
+          - IsProvisioned
+          - ReadCapacityUnits: !Ref ProvisionedReadCapacity
+            WriteCapacityUnits: !Ref ProvisionedWriteCapacity
+          - !Ref AWS::NoValue
+          
+      # Global Secondary Indexes
+      GlobalSecondaryIndexes:
+        # GSI1: Query by Type and Date
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            !If
+              - IsProvisioned
+              - ReadCapacityUnits: !Ref ProvisionedReadCapacity
+                WriteCapacityUnits: !Ref ProvisionedWriteCapacity
+              - !Ref AWS::NoValue
+              
+        # GSI2: Query by Client
+        - IndexName: GSI2
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            !If
+              - IsProvisioned
+              - ReadCapacityUnits: !Ref ProvisionedReadCapacity
+                WriteCapacityUnits: !Ref ProvisionedWriteCapacity
+              - !Ref AWS::NoValue
+              
+      # DynamoDB Streams
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+        
+      # Time to Live
+      TimeToLiveSpecification:
+        AttributeName: TTL
+        Enabled: true
+        
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [EnablePITR, true, false]
+        
+      # Server-Side Encryption
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        
+      # Tags
+      Tags:
+        - Key: Name
+          Value: !Ref TableName
+        - Key: Project
+          Value: ReadingAssistant
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+          
+  # CloudWatch Alarms
+  WriteThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${TableName}-WriteThrottle'
+      AlarmDescription: Alert when write requests are throttled
+      MetricName: WriteThrottleEvents
+      Namespace: AWS/DynamoDB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TableName
+          Value: !Ref ReadingSessionsTable
+      TreatMissingData: notBreaching
+      
+  ReadThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${TableName}-ReadThrottle'
+      AlarmDescription: Alert when read requests are throttled
+      MetricName: ReadThrottleEvents
+      Namespace: AWS/DynamoDB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TableName
+          Value: !Ref ReadingSessionsTable
+      TreatMissingData: notBreaching
+      
+  UserErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${TableName}-UserErrors'
+      AlarmDescription: Alert when user errors exceed threshold
+      MetricName: UserErrors
+      Namespace: AWS/DynamoDB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 50
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TableName
+          Value: !Ref ReadingSessionsTable
+      TreatMissingData: notBreaching
+      
+  SystemErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${TableName}-SystemErrors'
+      AlarmDescription: Alert when system errors occur
+      MetricName: SystemErrors
+      Namespace: AWS/DynamoDB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TableName
+          Value: !Ref ReadingSessionsTable
+      TreatMissingData: notBreaching
+      
+  # IAM Role for Application
+  ApplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${TableName}-ApplicationRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+                - ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref ApplicationPolicy
+      Tags:
+        - Key: Name
+          Value: !Sub '${TableName}-ApplicationRole'
+        - Key: Project
+          Value: ReadingAssistant
+          
+  # IAM Policy for DynamoDB Access
+  ApplicationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${TableName}-ApplicationPolicy'
+      Description: Policy for Reading Assistant application to access DynamoDB
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DynamoDBTableAccess
+            Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:BatchWriteItem
+              - dynamodb:BatchGetItem
+            Resource:
+              - !GetAtt ReadingSessionsTable.Arn
+              - !Sub '${ReadingSessionsTable.Arn}/index/*'
+              
+          - Sid: DynamoDBStreamAccess
+            Effect: Allow
+            Action:
+              - dynamodb:DescribeStream
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:ListStreams
+            Resource:
+              - !GetAtt ReadingSessionsTable.StreamArn
+              
+  # S3 Bucket for Audio Storage (Optional)
+  AudioStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${TableName}-audio-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldAudio
+            Status: Enabled
+            ExpirationInDays: !Ref TTLDays
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${TableName}-audio'
+        - Key: Project
+          Value: ReadingAssistant
+          
+  # S3 Bucket Policy
+  AudioStorageBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AudioStorageBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowApplicationAccess
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt ApplicationRole.Arn
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObject
+            Resource: !Sub '${AudioStorageBucket.Arn}/*'
+
+Outputs:
+  TableName:
+    Description: Name of the DynamoDB table
+    Value: !Ref ReadingSessionsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-TableName'
+      
+  TableArn:
+    Description: ARN of the DynamoDB table
+    Value: !GetAtt ReadingSessionsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-TableArn'
+      
+  StreamArn:
+    Description: ARN of the DynamoDB stream
+    Value: !GetAtt ReadingSessionsTable.StreamArn
+    Export:
+      Name: !Sub '${AWS::StackName}-StreamArn'
+      
+  ApplicationRoleArn:
+    Description: ARN of the IAM role for the application
+    Value: !GetAtt ApplicationRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationRoleArn'
+      
+  ApplicationPolicyArn:
+    Description: ARN of the IAM policy for DynamoDB access
+    Value: !Ref ApplicationPolicy
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationPolicyArn'
+      
+  AudioBucketName:
+    Description: Name of the S3 bucket for audio storage
+    Value: !Ref AudioStorageBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-AudioBucketName'
+      
+  AudioBucketArn:
+    Description: ARN of the S3 bucket for audio storage
+    Value: !GetAtt AudioStorageBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-AudioBucketArn'
+      
+  Region:
+    Description: AWS Region
+    Value: !Ref AWS::Region
+    Export:
+      Name: !Sub '${AWS::StackName}-Region'

@@ -121,6 +121,52 @@ session = audio_buffer_manager.get_session(client_id)
 print(f"Reading speed: {session.metrics.reading_speed_wpm} WPM")
 ```
 
+## 📊 Session Analysis & DynamoDB Integration
+
+The server now automatically saves comprehensive session analysis data to DynamoDB:
+
+- **Integration Guide**: See [SESSION_ANALYSIS_INTEGRATION.md](SESSION_ANALYSIS_INTEGRATION.md) for complete documentation
+- **Query Tool**: Use `python query_session_analysis.py` to retrieve session data
+- **Batch Metrics**: Per-minute reading analysis with miscue detection
+- **Session Summaries**: Complete session analysis with insights and recommendations
+
+### Key Features
+
+1. **Real-time Batch Analysis**: Analyze reading performance every 60 seconds
+2. **Miscue Detection**: Track omissions, insertions, substitutions, repetitions, and hesitations
+3. **Session Summaries**: Comprehensive end-of-session analysis with full transcript
+4. **DynamoDB Storage**: All data persisted to AWS DynamoDB for long-term analysis
+5. **Query API**: Retrieve complete session data programmatically
+
+### Quick Example
+
+```bash
+# List recent sessions
+python query_session_analysis.py
+
+# Query specific session with full analysis
+python query_session_analysis.py <session_id>
+```
+
+```python
+# Programmatic access
+from dynamodb_persistence import DynamoDBPersistence
+
+dynamodb = DynamoDBPersistence()
+data = await dynamodb.get_complete_session_data(session_id)
+
+# Access batch metrics
+for batch in data['batch_metrics']:
+    print(f"WPM: {batch['words_per_minute']}")
+    print(f"Miscues: {batch['miscue_counts']['Total']}")
+
+# Access session summary
+summary = data['session_summary']
+print(f"Total words: {summary['total_words']}")
+print(f"Average WPM: {summary['average_wpm']}")
+print(f"Insights: {summary['insights']}")
+```
+
 ## Configuration
 
 The reading assistant behavior can be configured in `config.py`:

@@ -11,9 +11,10 @@ from models import AudioChunk, ReadingSession
 class AudioBufferManager:
     """Manages audio chunks and timeline for reading sessions"""
     
-    def __init__(self):
+    def __init__(self, dynamodb_persistence=None):
         self.sessions: Dict[str, ReadingSession] = {}
         self.chunk_sequences: Dict[str, int] = {}  # client_id -> sequence number
+        self.dynamodb = dynamodb_persistence  # Optional DynamoDB persistence
         
     def create_session(self, client_id: str) -> ReadingSession:
         """Create a new reading session"""
@@ -24,6 +25,12 @@ class AudioBufferManager:
         )
         self.sessions[client_id] = session
         self.chunk_sequences[client_id] = 0
+        
+        # Persist to DynamoDB if enabled
+        if self.dynamodb:
+            import asyncio
+            asyncio.create_task(self.dynamodb.save_session(session))
+        
         return session
     
     def get_session(self, client_id: str) -> Optional[ReadingSession]:
@@ -35,6 +42,16 @@ class AudioBufferManager:
         if client_id in self.sessions:
             self.sessions[client_id].end_time = datetime.now()
             self._calculate_final_metrics(client_id)
+            
+            # Persist to DynamoDB if enabled
+            if self.dynamodb:
+                import asyncio
+                session = self.sessions[client_id]
+                asyncio.create_task(self.dynamodb.end_session(session.session_id, session.end_time))
+                asyncio.create_task(self.dynamodb.update_session_metrics(
+                    session.session_id,
+                    session.metrics.to_dict()
+                ))
     
     def store_chunk(
         self,
@@ -77,6 +94,11 @@ class AudioBufferManager:
         
         # Add to session
         session.audio_chunks.append(chunk)
+        
+        # Persist to DynamoDB if enabled
+        if self.dynamodb:
+            import asyncio
+            asyncio.create_task(self.dynamodb.save_audio_chunk(chunk))
         
         return chunk
     

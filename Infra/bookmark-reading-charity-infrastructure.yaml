@@ -64,6 +64,91 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
+  # DynamoDB Table: Reading Sessions (Audio Metadata)
+  ReadingSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: reading_sessions
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        # GSI1: Query by Type and Date
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # GSI2: Query by Client/Student
+        - IndexName: GSI2
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      TimeToLiveSpecification:
+        AttributeName: TTL
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Purpose
+          Value: AudioMetadataPersistence
+        - Key: Component
+          Value: ReadingAssistant
+
+  # S3 Bucket for Audio Storage (Optional)
+  AudioStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: bookmark-reading-charity-audio
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldAudio
+            Status: Enabled
+            ExpirationInDays: 30
+      Tags:
+        - Key: Purpose
+          Value: AudioDataStorage
+        - Key: Component
+          Value: ReadingAssistant
+
 Outputs:
   S3BucketName:
     Description: 'Name of the S3 bucket for storing books'
@@ -88,3 +173,33 @@ Outputs:
     Value: !Ref BooksTable
     Export:
       Name: !Sub '${AWS::StackName}-BooksTable'
+
+  ReadingSessionsTableName:
+    Description: 'Name of the reading sessions DynamoDB table (audio metadata)'
+    Value: !Ref ReadingSessionsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-ReadingSessionsTable'
+
+  ReadingSessionsTableArn:
+    Description: 'ARN of the reading sessions DynamoDB table'
+    Value: !GetAtt ReadingSessionsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ReadingSessionsTableArn'
+
+  ReadingSessionsStreamArn:
+    Description: 'ARN of the reading sessions DynamoDB stream'
+    Value: !GetAtt ReadingSessionsTable.StreamArn
+    Export:
+      Name: !Sub '${AWS::StackName}-ReadingSessionsStreamArn'
+
+  AudioStorageBucketName:
+    Description: 'Name of the S3 bucket for audio storage'
+    Value: !Ref AudioStorageBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-AudioStorageBucket'
+
+  AudioStorageBucketArn:
+    Description: 'ARN of the S3 bucket for audio storage'
+    Value: !GetAtt AudioStorageBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-AudioStorageBucketArn'
