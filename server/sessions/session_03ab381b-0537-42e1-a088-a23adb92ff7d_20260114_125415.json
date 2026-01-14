@@ -1,0 +1,72 @@
+{
+  "session_id": "03ab381b-0537-42e1-a088-a23adb92ff7d",
+  "start_time": "2026-01-14T12:52:39.673649",
+  "end_time": "2026-01-14T12:54:15.340283",
+  "total_duration_minutes": 1.5944439000000001,
+  "total_words": 43,
+  "average_wpm": 26.968650323790005,
+  "overall_accuracy": null,
+  "average_confidence": 0.0,
+  "total_miscue_counts": {
+    "omissions": 0,
+    "insertions": 0,
+    "substitutions": 0,
+    "repetitions": 8,
+    "self_corrections": 2,
+    "hesitations": 5,
+    "total": 15
+  },
+  "batch_metrics": [
+    {
+      "batch_id": "60618801-db55-4781-99df-38283f420faf",
+      "session_id": "03ab381b-0537-42e1-a088-a23adb92ff7d",
+      "start_time": "2026-01-14T12:52:44.927594",
+      "end_time": "2026-01-14T12:53:46.200324",
+      "duration_seconds": 61.27273,
+      "word_count": 43,
+      "words_per_minute": 64.6290772420292,
+      "average_confidence": 0.0,
+      "miscue_counts": {
+        "omissions": 0,
+        "insertions": 0,
+        "substitutions": 0,
+        "repetitions": 8,
+        "self_corrections": 2,
+        "hesitations": 5,
+        "total": 15
+      },
+      "miscue_events": [],
+      "expected_text": null,
+      "accuracy_percentage": null,
+      "transcriptions": [
+        "to myself.",
+        "I still for a little bit of stuff for me.",
+        "What should I know?",
+        "and those you I agree.",
+        "I",
+        "and",
+        "Yeah",
+        "a",
+        "you",
+        "I'm the expense I'm I'm the expense. I don't think they're about myself, yeah, I, I can stand up something that's generic. Oh yeah just",
+        "and it's a and it's, it's in the golden circle of right beside the stage."
+      ]
+    }
+  ],
+  "all_miscue_events": [],
+  "full_transcript": "to myself. I still for a little bit of stuff for me. What should I know? and those you I agree. I and Yeah a you I'm the expense I'm I'm the expense. I don't think they're about myself, yeah, I, I can stand up something that's generic. Oh yeah just and it's a and it's, it's in the golden circle of right beside the stage.",
+  "expected_passage": null,
+  "insights": {
+    "reading_speed": "below_grade_level",
+    "reading_speed_note": "Reading speed of 27 WPM is below typical range (60-150 WPM)",
+    "dominant_miscue_type": "repetitions",
+    "dominant_miscue_count": 8,
+    "recommendation": "Work on confidence and fluency through repeated reading",
+    "self_correction_rate": 15.384615384615385,
+    "self_monitoring": "Encourage the student to self-monitor and self-correct more actively",
+    "total_miscues": 13,
+    "total_words": 43,
+    "miscue_rate": 30.23255813953488,
+    "batches_analyzed": 1
+  }
+}

@@ -31,6 +31,7 @@ from models import (
     SessionMetrics
 )
 from audio_buffer_manager import AudioBufferManager
+from analysis import BatchAnalyzer, SessionAnalyzer
 
 class ReadingAssistant:
     """Analyzes accumulated transcriptions to detect if child needs help"""
@@ -254,6 +255,9 @@ class TranscriptHandler(TranscriptResultStreamHandler):
                         
                         # Add to reading assistant for analysis
                         await self.analyze_for_help(self.client_id, transcription_obj)
+                        
+                        # Add to batch analyzer for per-minute metrics
+                        await self.server_instance.analyze_batch(self.client_id, transcription_obj)
 
     async def analyze_for_help(self, client_id, transcription_obj):
         """Analyze transcription to detect if child needs help"""
@@ -406,11 +410,19 @@ class AudioWebSocketServer:
         self.reading_assistants = {}  # One assistant per client
         self.audio_buffer_manager = AudioBufferManager()  # Centralized audio/timeline management
         
+        # Analysis components
+        self.batch_analyzers = {}  # One batch analyzer per client
+        self.session_analyzer = None  # Will be initialized when needed
+        self.batch_interval_seconds = 60  # Analyze every 60 seconds (1 minute)
+        
         # Get AWS region from environment/config
         self.aws_region = self.get_aws_region()
         
         # Check AWS credentials
         self.check_aws_credentials()
+        
+        # Initialize session analyzer
+        self.session_analyzer = SessionAnalyzer(region=self.aws_region)
 
     def get_aws_region(self):
         """Get AWS region from environment or default to us-east-1"""
@@ -483,7 +495,7 @@ class AudioWebSocketServer:
         # End session and calculate final metrics
         self.audio_buffer_manager.end_session(client_id)
         
-        # Print session summary
+        # Perform end-of-session analysis
         session = self.audio_buffer_manager.get_session(client_id)
         if session:
             print(f"\n[SESSION ENDED] {client_id}")
@@ -492,6 +504,13 @@ class AudioWebSocketServer:
             print(f"Help Events: {len(session.help_events)}")
             print(f"Words: {session.metrics.total_words}")
             print(f"Reading Speed: {session.metrics.reading_speed_wpm:.1f} WPM")
+            
+            # Generate comprehensive session analysis
+            await self.generate_session_analysis(client_id)
+        
+        # Clean up batch analyzer
+        if client_id in self.batch_analyzers:
+            del self.batch_analyzers[client_id]
 
     async def process_message(self, message, client_id):
         """Process incoming messages from clients"""
@@ -671,6 +690,179 @@ class AudioWebSocketServer:
         except Exception as e:
             print(f"[{datetime.now()}] Error initializing Transcribe fallback: {e}")
 
+    async def analyze_batch(self, client_id, transcription_obj):
+        """Analyze transcription batch for per-minute metrics"""
+        try:
+            # Get or create batch analyzer for this client
+            if client_id not in self.batch_analyzers:
+                self.batch_analyzers[client_id] = BatchAnalyzer(
+                    batch_interval_seconds=self.batch_interval_seconds,
+                    region=self.aws_region,
+                    passage=None  # Can be set later if passage is provided
+                )
+            
+            batch_analyzer = self.batch_analyzers[client_id]
+            
+            # Add transcription to current batch
+            batch_analyzer.add_transcription(
+                text=transcription_obj.text,
+                timestamp=transcription_obj.created_at,
+                confidence=transcription_obj.confidence
+            )
+            
+            # Check if it's time to analyze the batch
+            if batch_analyzer.should_analyze_batch():
+                session = self.audio_buffer_manager.get_session(client_id)
+                if session:
+                    batch_metrics = await batch_analyzer.analyze_current_batch(session.session_id)
+                    
+                    if batch_metrics:
+                        # Send batch analysis results to client
+                        await self.send_batch_analysis(client_id, batch_metrics)
+        
+        except Exception as e:
+            print(f"[{datetime.now()}] Error in batch analysis: {e}")
+    
+    async def send_batch_analysis(self, client_id, batch_metrics):
+        """Send batch analysis results to client"""
+        try:
+            if client_id in self.clients:
+                websocket = self.clients[client_id]
+                
+                message = {
+                    "type": "batch_analysis",
+                    "batch_metrics": batch_metrics.to_dict(),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                await websocket.send(json.dumps(message))
+                
+                # Print detailed batch analysis to console
+                print(f"\n{'='*60}")
+                print(f"[BATCH ANALYSIS] Batch {str(batch_metrics.batch_id)[:8]}...")
+                print(f"{'='*60}")
+                print(f"Time Range: {batch_metrics.start_time.strftime('%H:%M:%S')} - {batch_metrics.end_time.strftime('%H:%M:%S')}")
+                print(f"Duration: {(batch_metrics.end_time - batch_metrics.start_time).total_seconds():.1f}s")
+                print(f"\nReading Metrics:")
+                print(f"  Words: {batch_metrics.word_count}")
+                print(f"  WPM: {batch_metrics.words_per_minute:.1f}")
+                print(f"  Confidence: {batch_metrics.average_confidence:.1%}")
+                if batch_metrics.accuracy_percentage is not None:
+                    print(f"  Accuracy: {batch_metrics.accuracy_percentage:.1f}%")
+                
+                total_miscues = (batch_metrics.omissions + batch_metrics.insertions + 
+                               batch_metrics.substitutions + batch_metrics.repetitions + 
+                               batch_metrics.hesitations)
+                print(f"\nMiscue Analysis:")
+                print(f"  Omissions: {batch_metrics.omissions}")
+                print(f"  Insertions: {batch_metrics.insertions}")
+                print(f"  Substitutions: {batch_metrics.substitutions}")
+                print(f"  Repetitions: {batch_metrics.repetitions}")
+                print(f"  Hesitations: {batch_metrics.hesitations}")
+                print(f"  Total Miscues: {total_miscues}")
+                
+                if batch_metrics.transcriptions:
+                    print(f"\nTranscript:")
+                    for i, trans in enumerate(batch_metrics.transcriptions, 1):
+                        print(f"  {i}. {trans}")
+                
+                print(f"{'='*60}\n")
+                
+        except Exception as e:
+            print(f"[{datetime.now()}] Error sending batch analysis: {e}")
+    
+    async def generate_session_analysis(self, client_id):
+        """Generate comprehensive end-of-session analysis"""
+        try:
+            session = self.audio_buffer_manager.get_session(client_id)
+            if not session:
+                return
+            
+            # Get batch results if available
+            batch_metrics = []
+            if client_id in self.batch_analyzers:
+                batch_metrics = self.batch_analyzers[client_id].get_batch_history()
+            
+            # Get all transcription texts
+            transcriptions = [t.text for t in session.transcriptions]
+            
+            # Generate session summary using session analyzer
+            if self.session_analyzer:
+                session_summary = await self.session_analyzer.analyze_session(
+                    session_id=session.session_id,
+                    start_time=session.start_time,
+                    end_time=session.end_time or datetime.now(),
+                    transcriptions=transcriptions,
+                    batch_metrics=batch_metrics,
+                    passage=None  # Can be set if passage is provided
+                )
+                
+                # Send session summary to client (if still connected)
+                if client_id in self.clients:
+                    await self.send_session_summary(client_id, session_summary)
+                else:
+                    # Log it even if client disconnected
+                    print(f"\\n[SESSION SUMMARY]")
+                    print(f"Session ID: {session_summary.session_id}")
+                    print(f"Total words: {session_summary.total_words}")
+                    print(f"Average WPM: {session_summary.average_wpm:.1f}")
+                    print(f"Total miscues: {session_summary.total_omissions + session_summary.total_insertions + session_summary.total_substitutions + session_summary.total_repetitions + session_summary.total_hesitations}")
+                    
+                    # Save to file for later retrieval
+                    self.save_session_summary_to_file(session_summary)
+        
+        except Exception as e:
+            print(f"[{datetime.now()}] Error generating session analysis: {e}")
+    
+    async def send_session_summary(self, client_id, session_summary):
+        """Send session summary to client"""
+        try:
+            if client_id in self.clients:
+                websocket = self.clients[client_id]
+                
+                message = {
+                    "type": "session_summary",
+                    "summary": session_summary.to_dict(),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                await websocket.send(json.dumps(message))
+                
+                print(f"\\n[SESSION SUMMARY SENT]")
+                print(f"Total words: {session_summary.total_words}")
+                print(f"Average WPM: {session_summary.average_wpm:.1f}")
+                if session_summary.overall_accuracy:
+                    print(f"Accuracy: {session_summary.overall_accuracy:.1f}%")
+                
+        except Exception as e:
+            print(f"[{datetime.now()}] Error sending session summary: {e}")
+    
+    def save_session_summary_to_file(self, session_summary):
+        """Save session summary to local file"""
+        try:
+            import os
+            
+            # Create sessions directory if it doesn't exist
+            sessions_dir = os.path.join(os.path.dirname(__file__), 'sessions')
+            os.makedirs(sessions_dir, exist_ok=True)
+            
+            # Save as JSON file
+            filename = f"session_{session_summary.session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            filepath = os.path.join(sessions_dir, filename)
+            
+            with open(filepath, 'w') as f:
+                json.dump(session_summary.to_dict(), f, indent=2)
+            
+            print(f"[SESSION SAVED] {filepath}")
+            
+        except Exception as e:
+            print(f"[{datetime.now()}] Error saving session summary: {e}")
+    
+    def set_passage_for_client(self, client_id, passage):
+        """Set the expected reading passage for a client"""
+        if client_id in self.batch_analyzers:
+            self.batch_analyzers[client_id].set_passage(passage)
+
     async def start_server(self):
         """Start the WebSocket server"""
         print(f"Starting Audio-to-Text WebSocket server on {self.host}:{self.port}")
@@ -678,9 +870,11 @@ class AudioWebSocketServer:
         print("1. Receive audio chunks from browser clients")
         print("2. Stream audio directly to Amazon Transcribe")
         print("3. Print transcribed text to console")
-        print("\nNOTE: Audio format compatibility depends on browser and Transcribe support")
+        print("4. Analyze reading patterns per minute")
+        print("5. Generate session summaries with miscue analysis")
+        print("\\nNOTE: Audio format compatibility depends on browser and Transcribe support")
         print("If transcription doesn't work, the client may need to send PCM format")
-        print("\nWaiting for connections...")
+        print("\\nWaiting for connections...")
         
         async with websockets.serve(self.handle_client, self.host, self.port):
             await asyncio.Future()  # Run forever
@@ -690,4 +884,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(server.start_server())
     except KeyboardInterrupt:
-        print("\nServer stopped by user")
+        print("\\nServer stopped by user")
