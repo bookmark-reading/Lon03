@@ -6,6 +6,7 @@ import io
 import os
 import struct
 from datetime import datetime
+from uuid import uuid4
 from amazon_transcribe.client import TranscribeStreamingClient
 from amazon_transcribe.handlers import TranscriptResultStreamHandler
 from amazon_transcribe.model import TranscriptEvent
@@ -21,22 +22,50 @@ from config import (
     POLLY_OUTPUT_FORMAT,
     POLLY_LANGUAGE_CODE
 )
+from models import (
+    AudioChunk,
+    Transcription,
+    HelpEvent,
+    WordTimestamp,
+    ReadingSession,
+    SessionMetrics
+)
+from audio_buffer_manager import AudioBufferManager
 
 class ReadingAssistant:
     """Analyzes accumulated transcriptions to detect if child needs help"""
     
-    def __init__(self, aws_region):
+    def __init__(self, aws_region, audio_buffer_manager):
         self.bedrock_runtime = boto3.client('bedrock-runtime', region_name=aws_region)
         self.polly_client = boto3.client('polly', region_name=aws_region)
         self.accumulated_text = []
         self.last_analysis_time = None
+        self.audio_buffer_manager = audio_buffer_manager
         
-    def add_transcription(self, text):
-        """Add a transcription to the accumulation buffer"""
-        self.accumulated_text.append({
+    def add_transcription(self, text, transcription_obj=None):
+        """Add a transcription to the accumulation buffer with metadata"""
+        current_timestamp = datetime.now()
+        
+        entry = {
             'text': text,
-            'timestamp': datetime.now()
-        })
+            'timestamp': current_timestamp,
+            'timestamp_iso': current_timestamp.isoformat()
+        }
+        
+        # Add metadata if transcription object provided
+        if transcription_obj:
+            entry['transcription_id'] = str(transcription_obj.transcription_id)
+            entry['start_time_ms'] = transcription_obj.start_time_ms
+            entry['end_time_ms'] = transcription_obj.end_time_ms
+            entry['session_offset_ms'] = transcription_obj.session_offset_ms
+            entry['audio_chunk_ids'] = [str(cid) for cid in transcription_obj.audio_chunk_ids]
+            entry['confidence'] = transcription_obj.confidence
+            entry['word_count'] = len(text.split())
+        
+        self.accumulated_text.append(entry)
+        
+        # Log the accumulation
+        print(f"[ACCUMULATED] '{text}' at {entry['timestamp_iso']}")
         
     def get_accumulated_text(self):
         """Get all accumulated text as a single string"""
@@ -157,49 +186,109 @@ class TranscriptHandler(TranscriptResultStreamHandler):
             if not result.is_partial:
                 for alt in result.alternatives:
                     transcript = alt.transcript
-                    confidence = alt.confidence if hasattr(alt, 'confidence') else 'N/A'
+                    confidence = alt.confidence if hasattr(alt, 'confidence') else 0.0
                     
-                    # Print transcription
-                    print(f"\n[TRANSCRIPTION] {transcript}")
+                    # Extract word-level timestamps if available
+                    word_timestamps = []
+                    if hasattr(result, 'items'):
+                        for item in result.items:
+                            if hasattr(item, 'start_time') and hasattr(item, 'end_time'):
+                                word_timestamps.append(WordTimestamp(
+                                    word=item.content,
+                                    start_time_ms=int(float(item.start_time) * 1000),
+                                    end_time_ms=int(float(item.end_time) * 1000),
+                                    confidence=item.confidence if hasattr(item, 'confidence') else 0.0
+                                ))
                     
-                    # Send final results to client
-                    await self.send_transcription_to_client(self.client_id, transcript, confidence, False)
-                    
-                    # Add to reading assistant for analysis
-                    await self.analyze_for_help(self.client_id, transcript)
+                    # Get session and calculate timing
+                    session = self.server_instance.audio_buffer_manager.get_session(self.client_id)
+                    if session:
+                        # Calculate start/end times from word timestamps or estimate
+                        if word_timestamps:
+                            start_time_ms = word_timestamps[0].start_time_ms
+                            end_time_ms = word_timestamps[-1].end_time_ms
+                        else:
+                            # Estimate based on current session time
+                            current_time = self.server_instance.audio_buffer_manager.get_current_session_time(self.client_id)
+                            # Rough estimate: 150 words per minute = 2.5 words per second
+                            word_count = len(transcript.split())
+                            estimated_duration_ms = int((word_count / 2.5) * 1000)
+                            end_time_ms = current_time
+                            start_time_ms = max(0, end_time_ms - estimated_duration_ms)
+                        
+                        # Get associated audio chunks
+                        audio_chunks = self.server_instance.audio_buffer_manager.get_chunks_in_range(
+                            self.client_id,
+                            start_time_ms,
+                            end_time_ms
+                        )
+                        audio_chunk_ids = [chunk.chunk_id for chunk in audio_chunks]
+                        
+                        # Create transcription object
+                        transcription_obj = Transcription(
+                            transcription_id=uuid4(),
+                            session_id=session.session_id,
+                            audio_chunk_ids=audio_chunk_ids,
+                            text=transcript,
+                            start_time_ms=start_time_ms,
+                            end_time_ms=end_time_ms,
+                            session_offset_ms=start_time_ms,
+                            confidence=confidence,
+                            is_final=True,
+                            word_timestamps=word_timestamps,
+                            created_at=datetime.now()
+                        )
+                        
+                        # Add to session
+                        session.transcriptions.append(transcription_obj)
+                        
+                        # Print transcription
+                        print(f"\n[TRANSCRIPTION] {transcript}")
+                        print(f"[METADATA] Time: {start_time_ms}-{end_time_ms}ms, Confidence: {confidence:.2f}")
+                        
+                        # Send final results to client with metadata
+                        await self.send_transcription_to_client(
+                            self.client_id,
+                            transcription_obj
+                        )
+                        
+                        # Add to reading assistant for analysis
+                        await self.analyze_for_help(self.client_id, transcription_obj)
 
-    async def analyze_for_help(self, client_id, transcript):
+    async def analyze_for_help(self, client_id, transcription_obj):
         """Analyze transcription to detect if child needs help"""
         try:
             # Get or create reading assistant for this client
             if client_id not in self.server_instance.reading_assistants:
                 self.server_instance.reading_assistants[client_id] = ReadingAssistant(
-                    self.server_instance.aws_region
+                    self.server_instance.aws_region,
+                    self.server_instance.audio_buffer_manager
                 )
             
             assistant = self.server_instance.reading_assistants[client_id]
             
-            # Add transcription to accumulation buffer
-            assistant.add_transcription(transcript)
+            # Add transcription to accumulation buffer with metadata
+            assistant.add_transcription(transcription_obj.text, transcription_obj)
             
             # Check if it's time to analyze
             if assistant.should_analyze():
                 result = await assistant.analyze_for_help()
                 
                 if result and result.get('needs_help'):
-                    await self.send_help_message(client_id, result)
+                    await self.send_help_message(client_id, result, transcription_obj)
                         
         except Exception as e:
             print(f"[{datetime.now()}] Error in help analysis: {e}")
 
-    async def send_help_message(self, client_id, analysis_result):
-        """Send help message to client with audio"""
+    async def send_help_message(self, client_id, analysis_result, transcription_obj):
+        """Send help message to client with audio and metadata"""
         try:
             if client_id in self.server_instance.clients:
                 websocket = self.server_instance.clients[client_id]
                 
-                # Get the reading assistant for this client
+                # Get the reading assistant and session
                 assistant = self.server_instance.reading_assistants.get(client_id)
+                session = self.server_instance.audio_buffer_manager.get_session(client_id)
                 
                 # Generate audio for the help message
                 audio_base64 = None
@@ -211,6 +300,53 @@ class TranscriptHandler(TranscriptResultStreamHandler):
                 # Print LLM response
                 print(f"\n[LLM RESPONSE] {help_message}")
                 
+                # Create help event with metadata
+                if session:
+                    # Get trigger transcriptions with timestamps from accumulated text
+                    trigger_texts = [item['text'] for item in assistant.accumulated_text]
+                    trigger_timestamps = [item['timestamp_iso'] for item in assistant.accumulated_text]
+                    
+                    # Calculate time range of accumulated text
+                    if assistant.accumulated_text:
+                        first_timestamp = assistant.accumulated_text[0]['timestamp']
+                        last_timestamp = assistant.accumulated_text[-1]['timestamp']
+                        accumulation_duration_ms = int((last_timestamp - first_timestamp).total_seconds() * 1000)
+                    else:
+                        accumulation_duration_ms = 0
+                    
+                    # Get audio segment IDs
+                    audio_segment_ids = []
+                    if assistant.accumulated_text:
+                        for item in assistant.accumulated_text:
+                            if 'audio_chunk_ids' in item:
+                                audio_segment_ids.extend([
+                                    uuid4() if isinstance(cid, str) else cid 
+                                    for cid in item['audio_chunk_ids']
+                                ])
+                    
+                    help_event = HelpEvent(
+                        event_id=uuid4(),
+                        session_id=session.session_id,
+                        session_time_offset_ms=transcription_obj.session_offset_ms,
+                        trigger_transcriptions=trigger_texts,
+                        trigger_timestamps=trigger_timestamps,
+                        accumulation_duration_ms=accumulation_duration_ms,
+                        audio_segment_ids=audio_segment_ids,
+                        help_message=help_message,
+                        audio_response=audio_base64,
+                        response_timestamp=datetime.now(),
+                        confidence=analysis_result.get('confidence', 0),
+                        reason=analysis_result.get('reason', '')
+                    )
+                    
+                    # Add to session
+                    session.help_events.append(help_event)
+                    
+                    # Print help event details
+                    print(f"[HELP EVENT] Session offset: {transcription_obj.session_offset_ms}ms")
+                    print(f"[HELP EVENT] Accumulation duration: {accumulation_duration_ms}ms")
+                    print(f"[HELP EVENT] Trigger count: {len(trigger_texts)}")
+                
                 message = {
                     "type": "help_needed",
                     "needs_help": analysis_result.get('needs_help', False),
@@ -218,7 +354,10 @@ class TranscriptHandler(TranscriptResultStreamHandler):
                     "audio": audio_base64,
                     "confidence": analysis_result.get('confidence', 0),
                     "reason": analysis_result.get('reason', ''),
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
+                    "session_time_offset_ms": transcription_obj.session_offset_ms if transcription_obj else 0,
+                    "trigger_timestamps": trigger_timestamps if assistant else [],
+                    "accumulation_duration_ms": accumulation_duration_ms if assistant else 0
                 }
                 
                 await websocket.send(json.dumps(message))
@@ -226,18 +365,31 @@ class TranscriptHandler(TranscriptResultStreamHandler):
         except Exception as e:
             print(f"[{datetime.now()}] Error sending help message: {e}")
 
-    async def send_transcription_to_client(self, client_id, transcript, confidence, is_partial):
-        """Send transcription results back to the client"""
+    async def send_transcription_to_client(self, client_id, transcription_obj):
+        """Send transcription results with metadata back to the client"""
         try:
             if client_id in self.server_instance.clients:
                 websocket = self.server_instance.clients[client_id]
                 
                 message = {
                     "type": "transcription",
-                    "text": transcript,
-                    "confidence": confidence,
-                    "is_partial": is_partial,
-                    "timestamp": datetime.now().isoformat()
+                    "transcription_id": str(transcription_obj.transcription_id),
+                    "text": transcription_obj.text,
+                    "confidence": transcription_obj.confidence,
+                    "is_final": transcription_obj.is_final,
+                    "start_time_ms": transcription_obj.start_time_ms,
+                    "end_time_ms": transcription_obj.end_time_ms,
+                    "session_offset_ms": transcription_obj.session_offset_ms,
+                    "word_timestamps": [
+                        {
+                            "word": wt.word,
+                            "start_time_ms": wt.start_time_ms,
+                            "end_time_ms": wt.end_time_ms,
+                            "confidence": wt.confidence
+                        }
+                        for wt in transcription_obj.word_timestamps
+                    ],
+                    "timestamp": transcription_obj.created_at.isoformat()
                 }
                 
                 await websocket.send(json.dumps(message))
@@ -252,6 +404,7 @@ class AudioWebSocketServer:
         self.clients = {}
         self.transcribe_clients = {}
         self.reading_assistants = {}  # One assistant per client
+        self.audio_buffer_manager = AudioBufferManager()  # Centralized audio/timeline management
         
         # Get AWS region from environment/config
         self.aws_region = self.get_aws_region()
@@ -326,6 +479,19 @@ class AudioWebSocketServer:
         
         if client_id in self.reading_assistants:
             del self.reading_assistants[client_id]
+        
+        # End session and calculate final metrics
+        self.audio_buffer_manager.end_session(client_id)
+        
+        # Print session summary
+        session = self.audio_buffer_manager.get_session(client_id)
+        if session:
+            print(f"\n[SESSION ENDED] {client_id}")
+            print(f"Duration: {session.total_duration_ms / 1000:.1f}s")
+            print(f"Transcriptions: {len(session.transcriptions)}")
+            print(f"Help Events: {len(session.help_events)}")
+            print(f"Words: {session.metrics.total_words}")
+            print(f"Reading Speed: {session.metrics.reading_speed_wpm:.1f} WPM")
 
     async def process_message(self, message, client_id):
         """Process incoming messages from clients"""
@@ -338,6 +504,14 @@ class AudioWebSocketServer:
                 if audio_data:
                     await self.process_audio_chunk(audio_data, client_id)
             
+            elif data.get("type") == "get_session_timeline":
+                # Client requesting session timeline
+                await self.send_session_timeline(client_id)
+            
+            elif data.get("type") == "get_session_metrics":
+                # Client requesting session metrics
+                await self.send_session_metrics(client_id)
+            
         except json.JSONDecodeError:
             # If not JSON, treat as raw base64 audio data
             await self.process_audio_chunk(message, client_id)
@@ -348,13 +522,30 @@ class AudioWebSocketServer:
             # Decode base64 audio
             audio_bytes = base64.b64decode(base64_audio)
             
+            # Get current encoding and sample rate from transcribe client
+            encoding = "pcm"
+            sample_rate = 16000
+            if client_id in self.transcribe_clients:
+                # Try to get from stored config (we'll need to track this)
+                encoding = getattr(self, f'_encoding_{client_id}', 'pcm')
+                sample_rate = getattr(self, f'_sample_rate_{client_id}', 16000)
+            
+            # Store audio chunk metadata (without storing actual audio data to save memory)
+            chunk = self.audio_buffer_manager.store_chunk(
+                client_id=client_id,
+                audio_bytes=audio_bytes,
+                sample_rate=sample_rate,
+                encoding=encoding,
+                store_audio_data=False  # Set to True if you need to replay audio later
+            )
+            
             # Check chunk size - Amazon Transcribe has limits
             max_chunk_size = 32 * 1024  # 32KB limit for safety
             if len(audio_bytes) > max_chunk_size:
                 # Split large chunks into smaller pieces
                 for i in range(0, len(audio_bytes), max_chunk_size):
-                    chunk = audio_bytes[i:i + max_chunk_size]
-                    await self.send_audio_chunk_to_transcribe(chunk, client_id)
+                    chunk_part = audio_bytes[i:i + max_chunk_size]
+                    await self.send_audio_chunk_to_transcribe(chunk_part, client_id)
             else:
                 await self.send_audio_chunk_to_transcribe(audio_bytes, client_id)
             
@@ -375,6 +566,47 @@ class AudioWebSocketServer:
             
         except Exception as e:
             print(f"[{datetime.now()}] Error sending audio to Transcribe: {e}")
+    
+    async def send_session_timeline(self, client_id):
+        """Send complete session timeline to client"""
+        try:
+            if client_id in self.clients:
+                websocket = self.clients[client_id]
+                timeline = self.audio_buffer_manager.get_session_timeline(client_id)
+                
+                message = {
+                    "type": "session_timeline",
+                    "timeline": timeline,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                await websocket.send(json.dumps(message))
+                
+        except Exception as e:
+            print(f"[{datetime.now()}] Error sending session timeline: {e}")
+    
+    async def send_session_metrics(self, client_id):
+        """Send session metrics to client"""
+        try:
+            if client_id in self.clients:
+                websocket = self.clients[client_id]
+                session = self.audio_buffer_manager.get_session(client_id)
+                
+                if session:
+                    # Calculate current metrics
+                    self.audio_buffer_manager._calculate_final_metrics(client_id)
+                    
+                    message = {
+                        "type": "session_metrics",
+                        "metrics": session.metrics.to_dict(),
+                        "session_info": session.to_dict(),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    
+                    await websocket.send(json.dumps(message))
+                
+        except Exception as e:
+            print(f"[{datetime.now()}] Error sending session metrics: {e}")
 
     async def initialize_transcribe_client(self, client_id):
         """Initialize Amazon Transcribe streaming client for a client"""
@@ -390,6 +622,10 @@ class AudioWebSocketServer:
                 enable_partial_results_stabilization=True,
                 partial_results_stability="medium"
             )
+            
+            # Store encoding config for this client
+            setattr(self, f'_encoding_{client_id}', 'pcm')
+            setattr(self, f'_sample_rate_{client_id}', 16000)
             
             # Create transcript handler with the stream and server instance
             handler = TranscriptHandler(stream.output_stream, client_id, self)
@@ -418,6 +654,10 @@ class AudioWebSocketServer:
                 enable_partial_results_stabilization=True,
                 partial_results_stability="medium"
             )
+            
+            # Store encoding config for this client
+            setattr(self, f'_encoding_{client_id}', 'ogg-opus')
+            setattr(self, f'_sample_rate_{client_id}', 48000)
             
             # Create transcript handler with the stream and server instance
             handler = TranscriptHandler(stream.output_stream, client_id, self)
