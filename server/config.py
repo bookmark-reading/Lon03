@@ -30,7 +30,7 @@ Respond ONLY with valid JSON in this exact format:
 Be encouraging and supportive. If help is needed, provide specific, age-appropriate guidance."""
 
 # Bedrock Inference Configuration
-BEDROCK_TEMPERATURE = 0.8  # Lower temperature for more consistent responses
+BEDROCK_TEMPERATURE = 0.3  # Lower temperature for more consistent responses
 BEDROCK_MAX_TOKENS = 500  # Maximum tokens in response
 
 # Amazon Polly Text-to-Speech Settings
