@@ -22,6 +22,11 @@ class DynamoDBConfig:
     CHUNK_BATCH_SIZE: int = int(os.getenv('DYNAMODB_CHUNK_BATCH_SIZE', '10'))
     TRANSCRIPTION_BATCH_SIZE: int = int(os.getenv('DYNAMODB_TRANSCRIPTION_BATCH_SIZE', '5'))
     
+    # Immediate Write Settings
+    IMMEDIATE_WRITE_BATCH_METRICS: bool = os.getenv('DYNAMODB_IMMEDIATE_BATCH_METRICS', 'true').lower() == 'true'
+    IMMEDIATE_WRITE_SESSION_SUMMARY: bool = os.getenv('DYNAMODB_IMMEDIATE_SESSION_SUMMARY', 'true').lower() == 'true'
+    IMMEDIATE_WRITE_HELP_EVENTS: bool = os.getenv('DYNAMODB_IMMEDIATE_HELP_EVENTS', 'true').lower() == 'true'
+    
     # TTL Settings (30 days default)
     TTL_DAYS: int = int(os.getenv('DYNAMODB_TTL_DAYS', '30'))
     
@@ -58,5 +63,8 @@ class DynamoDBConfig:
             'enabled': cls.ENABLED,
             'batch_size': cls.BATCH_SIZE,
             'ttl_days': cls.TTL_DAYS,
-            's3_enabled': cls.STORE_AUDIO_IN_S3
+            's3_enabled': cls.STORE_AUDIO_IN_S3,
+            'immediate_batch_metrics': cls.IMMEDIATE_WRITE_BATCH_METRICS,
+            'immediate_session_summary': cls.IMMEDIATE_WRITE_SESSION_SUMMARY,
+            'immediate_help_events': cls.IMMEDIATE_WRITE_HELP_EVENTS
         }

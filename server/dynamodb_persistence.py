@@ -92,14 +92,20 @@ class DynamoDBPersistence:
             return False
     
     async def save_help_event(self, help_event: HelpEvent) -> bool:
-        """Save help event to DynamoDB (immediate write)"""
+        """Save help event to DynamoDB (immediate write by default)"""
         try:
             item = DynamoDBMapper.help_event_to_item(help_event)
             
-            # Immediate write for help events (important)
-            await self.write_queue.put(('put_item', item))
+            # Check if immediate write is enabled
+            if DynamoDBConfig.IMMEDIATE_WRITE_HELP_EVENTS:
+                # Write immediately (synchronous)
+                await self._write_item_immediately(item)
+                print(f"[DynamoDB] Saved help event immediately: {help_event.event_id}")
+            else:
+                # Queue for background write
+                await self.write_queue.put(('put_item', item))
+                print(f"[DynamoDB] Queued help event: {help_event.event_id}")
             
-            print(f"[DynamoDB] Queued help event: {help_event.event_id}")
             return True
             
         except Exception as e:
@@ -160,17 +166,23 @@ class DynamoDBPersistence:
             return False
     
     async def save_batch_metrics(self, batch_metrics) -> bool:
-        """Save batch metrics to DynamoDB"""
+        """Save batch metrics to DynamoDB (immediate write by default)"""
         try:
             item = DynamoDBMapper.batch_metrics_to_item(batch_metrics)
             
             if not item:
                 return False
             
-            # Immediate write for batch metrics
-            await self.write_queue.put(('put_item', item))
+            # Check if immediate write is enabled
+            if DynamoDBConfig.IMMEDIATE_WRITE_BATCH_METRICS:
+                # Write immediately (synchronous)
+                await self._write_item_immediately(item)
+                print(f"[DynamoDB] Saved batch metrics immediately: {batch_metrics.batch_id}")
+            else:
+                # Queue for background write
+                await self.write_queue.put(('put_item', item))
+                print(f"[DynamoDB] Queued batch metrics: {batch_metrics.batch_id}")
             
-            print(f"[DynamoDB] Queued batch metrics: {batch_metrics.batch_id}")
             return True
             
         except Exception as e:
@@ -178,17 +190,23 @@ class DynamoDBPersistence:
             return False
     
     async def save_session_summary(self, session_summary) -> bool:
-        """Save session summary to DynamoDB"""
+        """Save session summary to DynamoDB (immediate write by default)"""
         try:
             item = DynamoDBMapper.session_summary_to_item(session_summary)
             
             if not item:
                 return False
             
-            # Immediate write for session summary
-            await self.write_queue.put(('put_item', item))
+            # Check if immediate write is enabled
+            if DynamoDBConfig.IMMEDIATE_WRITE_SESSION_SUMMARY:
+                # Write immediately (synchronous)
+                await self._write_item_immediately(item)
+                print(f"[DynamoDB] Saved session summary immediately: {session_summary.session_id}")
+            else:
+                # Queue for background write
+                await self.write_queue.put(('put_item', item))
+                print(f"[DynamoDB] Queued session summary: {session_summary.session_id}")
             
-            print(f"[DynamoDB] Queued session summary: {session_summary.session_id}")
             return True
             
         except Exception as e:
@@ -528,6 +546,16 @@ class DynamoDBPersistence:
             await self.flush_all_queues()
     
     # ==================== Utility Methods ====================
+    
+    async def _write_item_immediately(self, item: Dict):
+        """Write item to DynamoDB immediately (synchronous)"""
+        try:
+            # Use asyncio to run the synchronous boto3 call
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, lambda: self.table.put_item(Item=item))
+        except Exception as e:
+            print(f"[DynamoDB] Immediate write error: {e}")
+            raise
     
     async def create_student_index(self, student_id: str, session_id: UUID, start_time: datetime):
         """Create index entry for student lookup"""
