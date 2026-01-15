@@ -144,6 +144,32 @@ const Reading = () => {
                 });
                 addToLog(`Transcribed: "${message.text}"`, 'success');
               }
+            } else if (message.type === 'help_needed' && message.needs_help) {
+              // Add help message to chat
+              const helpMessage: ChatMessage = {
+                id: Date.now().toString(),
+                userId: 'assistant',
+                userName: 'Reading Assistant',
+                avatarUrl: '',
+                content: message.help_message,
+                timestamp: new Date().toISOString(),
+              };
+              
+              setMessages(prev => [...prev, helpMessage]);
+              addToLog(`Assistant: "${message.help_message}"`, 'success');
+              
+              // Play audio if available
+              if (message.audio) {
+                try {
+                  const audioBlob = new Blob([Uint8Array.from(atob(message.audio), c => c.charCodeAt(0))], { type: 'audio/mp3' });
+                  const audioUrl = URL.createObjectURL(audioBlob);
+                  const audio = new Audio(audioUrl);
+                  audio.play();
+                  addToLog('Playing assistant audio response', 'success');
+                } catch (error) {
+                  addToLog('Error playing audio response', 'error');
+                }
+              }
             }
           } catch (error) {
             addToLog('❌ Error parsing WebSocket message', 'error');
@@ -575,13 +601,17 @@ const Reading = () => {
                     <Avatar className="h-8 w-8 flex-shrink-0">
                       <AvatarImage src={message.avatarUrl} />
                       <AvatarFallback className="text-xs">
-                        {message.userId === 'transcription' ? '🎤' : message.userName.charAt(0)}
+                        {message.userId === 'transcription' ? '🎤' : 
+                         message.userId === 'assistant' ? '🤖' : 
+                         message.userName.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
                         <span className={`text-sm font-medium ${
-                          message.userId === 'transcription' ? 'text-blue-400' : 'text-white'
+                          message.userId === 'transcription' ? 'text-blue-400' : 
+                          message.userId === 'assistant' ? 'text-green-400' : 
+                          'text-white'
                         }`}>
                           {message.userName}
                         </span>
@@ -594,7 +624,9 @@ const Reading = () => {
                           ? message.userName === 'Listening...' 
                             ? 'text-gray-400 italic' 
                             : 'text-blue-300'
-                          : 'text-gray-300'
+                          : message.userId === 'assistant'
+                            ? 'text-green-300'
+                            : 'text-gray-300'
                       }`}>
                         {message.content}
                       </p>
