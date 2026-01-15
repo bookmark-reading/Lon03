@@ -3,12 +3,14 @@ import { sampleBooks } from "@/data/sampleBooks";
 import { cloudfrontBooks } from "@/config/books";
 
 export const fetchBooks = async (): Promise<Book[]> => {
-  const validBooks = cloudfrontBooks.filter(book => book.pdfUrl);
-  return validBooks.length > 0 ? validBooks : sampleBooks;
+  return cloudfrontBooks.length > 0 ? cloudfrontBooks : sampleBooks;
 };
 
 export const fetchBook = async (bookId: string): Promise<Book | null> => {
-  const book = cloudfrontBooks.find(b => b.id === bookId);
-  if (book && book.pdfUrl) return book;
+  // First try CloudFront books
+  const cloudfrontBook = cloudfrontBooks.find(b => b.id === bookId);
+  if (cloudfrontBook) return cloudfrontBook;
+  
+  // Fallback to sample books only if CloudFront book not found
   return sampleBooks.find(b => b.id === bookId) || null;
 };

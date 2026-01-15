@@ -71,3 +71,4 @@ cdk.out/
 # Logs
 logs/
 *.log
+.python-version
