@@ -9,7 +9,7 @@ export const cloudfrontBooks: Book[] = [
     description: "A fun adventure story about monkeys and their playful antics.",
     genre: "Children's Fiction",
     pdfUrl: "https://datfi4tnj5vc7.cloudfront.net/books-pdf/3-L.3-MonkeyBusiness.pdf",
-    interests: ["animals", "adventure", "nature"],
+    interests: ["nature"],
     chapters: [],
   },
   {
@@ -20,7 +20,7 @@ export const cloudfrontBooks: Book[] = [
     description: "An inspiring tale about a lion learning the importance of trying.",
     genre: "Children's Fiction",
     pdfUrl: "https://datfi4tnj5vc7.cloudfront.net/books-pdf/2-L.3-TheLionwhoWouldntTry.pdf",
-    interests: ["animals", "adventure"],
+    interests: ["animals"],
     chapters: [],
   },
   {
@@ -31,7 +31,7 @@ export const cloudfrontBooks: Book[] = [
     description: "An imaginative journey through a bathtub safari adventure.",
     genre: "Children's Fiction",
     pdfUrl: "https://datfi4tnj5vc7.cloudfront.net/books-pdf/1-L.2-BathtubSafari.pdf",
-    interests: ["animals", "adventure", "nature"],
+    interests: ["adventure"],
     chapters: [],
   },
 ];
