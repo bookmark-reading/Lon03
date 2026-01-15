@@ -122,7 +122,7 @@ const Reading = () => {
             
             if (message.type === 'transcription') {
               const transcriptionMessage: ChatMessage = {
-                id: Date.now().toString(),
+                id: `${Date.now()}-${Math.random()}`,
                 userId: 'transcription',
                 userName: message.is_partial ? 'Listening...' : 'Transcription',
                 avatarUrl: '',
@@ -131,13 +131,15 @@ const Reading = () => {
               };
               
               if (message.is_partial) {
+                // Update or add partial transcription
                 setMessages(prev => {
-                  const filtered = prev.filter(m => m.userId !== 'transcription' || m.userName !== 'Listening...');
+                  const filtered = prev.filter(m => !(m.userId === 'transcription' && m.userName === 'Listening...'));
                   return [...filtered, transcriptionMessage];
                 });
               } else {
+                // Add final transcription as new message
                 setMessages(prev => {
-                  const filtered = prev.filter(m => m.userId !== 'transcription');
+                  const filtered = prev.filter(m => !(m.userId === 'transcription' && m.userName === 'Listening...'));
                   return [...filtered, transcriptionMessage];
                 });
                 addToLog(`Transcribed: "${message.text}"`, 'success');
@@ -602,29 +604,6 @@ const Reading = () => {
                 <div ref={chatEndRef} />
               </div>
             </ScrollArea>
-
-            {/* Message Input */}
-            <div className="p-4 border-t border-gray-700">
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Type a message..."
-                  className="flex-1 bg-gray-700 border-gray-600"
-                  onKeyPress={handleKeyPress}
-                />
-                <Button
-                  size="sm"
-                  onClick={(e) => {
-                    const input = (e.target as HTMLElement).parentElement?.querySelector('input') as HTMLInputElement;
-                    if (input) {
-                      sendMessage(input.value);
-                      input.value = '';
-                    }
-                  }}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
 
             {/* Activity Log */}
             <div className="p-4 border-t border-gray-700 bg-gray-900">

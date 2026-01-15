@@ -68,27 +68,33 @@ class ReadingAssistant:
             prompt = READING_ASSISTANT_PROMPT.format(text=accumulated)
 
             # Call Bedrock Nova Lite
-            request_body = {
+            request_body = json.dumps({
                 "messages": [
                     {
                         "role": "user",
-                        "content": [{"text": prompt}]
+                        "content": [
+                            {
+                                "text": prompt
+                            }
+                        ]
                     }
                 ],
                 "inferenceConfig": {
-                    "temperature": BEDROCK_TEMPERATURE,
-                    "maxTokens": BEDROCK_MAX_TOKENS
+                    "maxTokens": BEDROCK_MAX_TOKENS,
+                    "temperature": BEDROCK_TEMPERATURE
                 }
-            }
+            })
             
-            response = self.bedrock_runtime.converse(
+            response = self.bedrock_runtime.invoke_model(
                 modelId=BEDROCK_MODEL_ID,
-                messages=request_body["messages"],
-                inferenceConfig=request_body["inferenceConfig"]
+                body=request_body,
+                contentType="application/json",
+                accept="application/json"
             )
             
             # Extract response
-            response_text = response['output']['message']['content'][0]['text']
+            response_body = json.loads(response['body'].read())
+            response_text = response_body['output']['message']['content'][0]['text']
             
             # Parse JSON response
             result = json.loads(response_text)
